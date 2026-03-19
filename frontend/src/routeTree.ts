@@ -1,0 +1,96 @@
+import {
+  createRootRoute,
+  createRoute,
+  useParams,
+} from "@tanstack/react-router";
+import { RootLayout } from "./components/RootLayout";
+import { HomePage } from "./routes/index";
+import { SkillsPage } from "./routes/skills";
+import { SkillDetailPage } from "./routes/skillDetail";
+import { SearchPage } from "./routes/search";
+import { LoginPage } from "./routes/login";
+import { SignUpPage } from "./routes/signup";
+import { AuthCallbackPage } from "./routes/authCallback";
+import { DashboardPage } from "./routes/dashboard";
+import { UploadPage } from "./routes/upload";
+import { SettingsPage } from "./routes/settings";
+
+const rootRoute = createRootRoute({
+  component: RootLayout,
+});
+
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  component: HomePage,
+});
+
+const skillsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/skills",
+  component: SkillsPage,
+});
+
+const skillDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/skills/$slug",
+  component: function SkillDetailWrapper() {
+    const { slug } = useParams({ from: "/skills/$slug" });
+    return SkillDetailPage({ slug });
+  },
+});
+
+const searchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/search",
+  component: SearchPage,
+});
+
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/login",
+  component: LoginPage,
+});
+
+const signupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/signup",
+  component: SignUpPage,
+});
+
+const authCallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/auth/callback",
+  component: AuthCallbackPage,
+});
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dashboard",
+  component: DashboardPage,
+});
+
+const uploadRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/upload",
+  component: UploadPage,
+});
+
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings",
+  component: SettingsPage,
+});
+
+export const routeTree = rootRoute.addChildren([
+  indexRoute,
+  skillsRoute,
+  skillDetailRoute,
+  searchRoute,
+  loginRoute,
+  signupRoute,
+  authCallbackRoute,
+  dashboardRoute,
+  uploadRoute,
+  settingsRoute,
+]);
