@@ -14,6 +14,7 @@ import { AuthCallbackPage } from "./routes/authCallback";
 import { DashboardPage } from "./routes/dashboard";
 import { UploadPage } from "./routes/upload";
 import { SettingsPage } from "./routes/settings";
+import { UserProfilePage } from "./routes/userProfile";
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -82,6 +83,15 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
+const userProfileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/u/$handle",
+  component: function UserProfileWrapper() {
+    const { handle } = useParams({ from: "/u/$handle" });
+    return UserProfilePage({ handle });
+  },
+});
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   skillsRoute,
@@ -93,4 +103,5 @@ export const routeTree = rootRoute.addChildren([
   dashboardRoute,
   uploadRoute,
   settingsRoute,
+  userProfileRoute,
 ]);

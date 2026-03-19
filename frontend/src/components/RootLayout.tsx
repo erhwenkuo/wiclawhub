@@ -44,6 +44,14 @@ export function RootLayout() {
             >
               Skills
             </Link>
+            {user && (
+              <Link
+                to="/upload"
+                className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+              >
+                Upload
+              </Link>
+            )}
             <Link
               to="/search"
               className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"

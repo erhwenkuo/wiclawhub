@@ -10,8 +10,9 @@ router = APIRouter()
 
 @router.get("/search", response_model=SearchResponse, tags=["search"], summary="Search skills", description="Full-text search across skill slugs, display names, and summaries.")
 async def search_skills(
-    q: str = Query(...),
-    limit: int = Query(20, ge=1, le=100),
+    q: str = Query(""),
+    limit: int = Query(100, ge=1, le=500),
+    sort: str = Query("updated"),
     highlightedOnly: bool = Query(False),
     nonSuspiciousOnly: bool = Query(False),
     nonSuspicious: bool = Query(False),
@@ -22,6 +23,7 @@ async def search_skills(
         session,
         q=q,
         limit=limit,
+        sort=sort,
         highlighted_only=highlightedOnly,
         non_suspicious_only=non_sus,
     )

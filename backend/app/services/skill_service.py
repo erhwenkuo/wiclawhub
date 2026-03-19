@@ -15,12 +15,27 @@ def _now() -> float:
     return datetime.now(timezone.utc).timestamp()
 
 
+async def count_skills(
+    session: AsyncSession,
+    non_suspicious_only: bool = False,
+) -> int:
+    query = select(func.count(Skill.id)).where(Skill.is_deleted == False)  # noqa: E712
+    if non_suspicious_only:
+        suspicious_ids = select(SkillModeration.skill_id).where(
+            SkillModeration.is_suspicious == True  # noqa: E712
+        )
+        query = query.where(Skill.id.notin_(suspicious_ids))
+    result = await session.execute(query)
+    return result.scalar_one()
+
+
 async def list_skills(
     session: AsyncSession,
     limit: int = 20,
     cursor: str | None = None,
     non_suspicious_only: bool = False,
     owner_id: uuid.UUID | None = None,
+    sort: str = "updated",
 ) -> tuple[list[dict], str | None]:
     query = select(Skill).where(Skill.is_deleted == False)  # noqa: E712
 
@@ -33,14 +48,47 @@ async def list_skills(
         )
         query = query.where(Skill.id.notin_(suspicious_ids))
 
-    query = query.order_by(Skill.updated_at.desc())
+    # Sorting
+    if sort == "downloads":
+        # stats is JSON; sort by extracting downloads key
+        # For SQLite/PG compatibility, fetch all and sort in Python
+        pass
+    else:
+        query = query.order_by(Skill.updated_at.desc())
 
-    if cursor:
+    if sort != "downloads" and cursor:
         try:
             cursor_ts = float(cursor)
             query = query.where(Skill.updated_at < cursor_ts)
         except ValueError:
             pass
+
+    if sort == "downloads":
+        # Fetch all matching, sort in Python by stats.downloads
+        result = await session.execute(query)
+        all_skills = list(result.scalars().all())
+        all_skills.sort(
+            key=lambda s: (s.stats or {}).get("downloads", 0), reverse=True
+        )
+        # Apply cursor-based pagination using index offset
+        start = 0
+        if cursor:
+            try:
+                start = int(cursor)
+            except ValueError:
+                pass
+        page = all_skills[start : start + limit + 1]
+        next_cursor = None
+        if len(page) > limit:
+            page = page[:limit]
+            next_cursor = str(start + limit)
+
+        items = []
+        for skill in page:
+            latest = await _get_latest_version(session, skill.id)
+            owner = await _get_owner(session, skill.owner_id)
+            items.append({"skill": skill, "latestVersion": latest, "owner": owner})
+        return items, next_cursor
 
     query = query.limit(limit + 1)
     result = await session.execute(query)
@@ -54,21 +102,32 @@ async def list_skills(
     items = []
     for skill in skills:
         latest = await _get_latest_version(session, skill.id)
+        owner = await _get_owner(session, skill.owner_id)
         items.append({
             "skill": skill,
             "latestVersion": latest,
+            "owner": owner,
         })
 
     return items, next_cursor
 
 
-async def get_skill(session: AsyncSession, slug: str) -> dict | None:
+async def get_skill(session: AsyncSession, slug: str, increment_view: bool = True) -> dict | None:
     result = await session.execute(
         select(Skill).where(Skill.slug == slug, Skill.is_deleted == False)  # noqa: E712
     )
     skill = result.scalars().first()
     if skill is None:
         return None
+
+    # Increment view count
+    if increment_view:
+        stats = dict(skill.stats or {})
+        stats["views"] = stats.get("views", 0) + 1
+        skill.stats = stats
+        session.add(skill)
+        await session.commit()
+        await session.refresh(skill)
 
     owner = await _get_owner(session, skill.owner_id)
     latest = await _get_latest_version(session, skill.id)
@@ -350,8 +409,9 @@ async def get_file_content(
 
 async def search_skills(
     session: AsyncSession,
-    q: str,
-    limit: int = 20,
+    q: str = "",
+    limit: int = 100,
+    sort: str = "updated",
     highlighted_only: bool = False,
     non_suspicious_only: bool = False,
 ) -> list[dict]:
@@ -363,26 +423,35 @@ async def search_skills(
         )
         query = query.where(Skill.id.notin_(suspicious_ids))
 
-    search_term = f"%{q}%"
-    query = query.where(
-        (Skill.slug.ilike(search_term))
-        | (Skill.display_name.ilike(search_term))
-        | (Skill.summary.ilike(search_term))
-    )
+    if q.strip():
+        search_term = f"%{q}%"
+        query = query.where(
+            (Skill.slug.ilike(search_term))
+            | (Skill.display_name.ilike(search_term))
+            | (Skill.summary.ilike(search_term))
+        )
+
     query = query.order_by(Skill.updated_at.desc()).limit(limit)
 
     result = await session.execute(query)
-    skills = result.scalars().all()
+    skills = list(result.scalars().all())
 
     items = []
     for skill in skills:
         latest = await _get_latest_version(session, skill.id)
-        score = 1.0
-        if q.lower() in (skill.slug or "").lower():
-            score = 2.0
-        if q.lower() == (skill.slug or "").lower():
-            score = 3.0
+        owner = await _get_owner(session, skill.owner_id)
 
+        score = 1.0
+        if q.strip():
+            if q.lower() in (skill.slug or "").lower():
+                score = 2.0
+            if q.lower() == (skill.slug or "").lower():
+                score = 3.0
+
+        stats = skill.stats or {}
+        downloads = stats.get("downloads", 0)
+        stars = stats.get("stars", 0)
+        views = stats.get("views", 0)
         items.append({
             "score": score,
             "slug": skill.slug,
@@ -390,9 +459,18 @@ async def search_skills(
             "summary": skill.summary,
             "version": latest.version if latest else None,
             "updatedAt": skill.updated_at,
+            "downloads": downloads,
+            "stars": stars,
+            "views": views,
+            "ownerHandle": owner.handle if owner else None,
+            "ownerImage": owner.image if owner else None,
         })
 
-    items.sort(key=lambda x: x["score"], reverse=True)
+    if sort == "downloads":
+        items.sort(key=lambda x: x["downloads"], reverse=True)
+    elif q.strip():
+        items.sort(key=lambda x: x["score"], reverse=True)
+
     return items
 
 

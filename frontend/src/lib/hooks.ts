@@ -22,7 +22,7 @@ export function useSkills(limit = 20, cursor?: string) {
 export function useSkill(slug: string) {
   return useQuery<SkillResponse>({
     queryKey: ["skill", slug],
-    queryFn: () => apiFetch(`/skills/${slug}`),
+    queryFn: () => apiFetch(`/skills/${slug}?view=false`),
     enabled: !!slug,
   });
 }
@@ -43,11 +43,18 @@ export function useVersion(slug: string, version: string) {
   });
 }
 
-export function useSearch(q: string, limit = 20) {
+export function useSearch(q: string, sort = "updated", limit = 100) {
+  const params = new URLSearchParams({ q, sort, limit: String(limit) });
   return useQuery<SearchResponse>({
-    queryKey: ["search", q, limit],
-    queryFn: () => apiFetch(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
-    enabled: q.length > 0,
+    queryKey: ["search", q, sort, limit],
+    queryFn: () => apiFetch(`/search?${params}`),
+  });
+}
+
+export function useSkillCount() {
+  return useQuery<{ total: number }>({
+    queryKey: ["skills-count"],
+    queryFn: () => apiFetch("/skills/count"),
   });
 }
 

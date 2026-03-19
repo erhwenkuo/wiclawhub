@@ -1,10 +1,11 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Download,
   Star,
   Clock,
+  Eye,
   Shield,
   FileText,
   ChevronDown,
@@ -12,6 +13,9 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useSkill, useVersions, useVersion, useFileContent } from "@/lib/hooks";
 import { formatDate, timeAgo, formatNumber } from "@/lib/format";
 import { TagBadge } from "@/components/TagBadge";
@@ -24,10 +28,52 @@ const CodeViewer = lazy(() =>
 export function SkillDetailPage({ slug }: { slug: string }) {
   const { data, isLoading, error, refetch } = useSkill(slug);
   const { data: versionsData } = useVersions(slug);
+  const { token, user: authUser } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Fire a one-time view count on page mount
+  const viewCounted = useRef(false);
+  useEffect(() => {
+    if (!viewCounted.current) {
+      viewCounted.current = true;
+      apiFetch(`/skills/${slug}?view=true`).catch(() => {});
+    }
+  }, [slug]);
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
   const [showVersions, setShowVersions] = useState(false);
+  const [starring, setStarring] = useState(false);
+
+  // Check if current user has starred this skill
+  const { data: starData } = useQuery<{ starred: boolean }>({
+    queryKey: ["star-check", slug],
+    queryFn: () =>
+      apiFetch(`/skills/${slug}/star`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    enabled: !!token,
+  });
+
+  const isStarred = starData?.starred ?? false;
+
+  const handleToggleStar = async () => {
+    if (!token || starring) return;
+    setStarring(true);
+    try {
+      const method = isStarred ? "DELETE" : "POST";
+      await apiFetch(`/skills/${slug}/star`, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["star-check", slug] }),
+        queryClient.invalidateQueries({ queryKey: ["skill", slug] }),
+      ]);
+    } finally {
+      setStarring(false);
+    }
+  };
 
   const latestVersion = data?.latestVersion?.version;
   const displayVersion = selectedVersion ?? latestVersion;
@@ -46,6 +92,7 @@ export function SkillDetailPage({ slug }: { slug: string }) {
   const tags = Object.values(skill.tags);
   const downloads = skill.stats?.downloads ?? 0;
   const stars = skill.stats?.stars ?? 0;
+  const views = skill.stats?.views ?? 0;
 
   const panel =
     "rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900";
@@ -69,18 +116,33 @@ export function SkillDetailPage({ slug }: { slug: string }) {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">
               {skill.displayName}
             </h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {skill.slug}
+            <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+              <span>{skill.slug}</span>
               {owner && (
-                <span>
-                  {" "}
-                  &middot; by{" "}
-                  <span className="font-medium text-gray-700 dark:text-gray-300">
-                    {owner.displayName ?? owner.handle ?? "unknown"}
-                  </span>
-                </span>
+                <>
+                  <span>&middot;</span>
+                  <span>by</span>
+                  {owner.image ? (
+                    <img
+                      src={owner.image}
+                      alt=""
+                      className="h-5 w-5 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-[10px] font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                      {(owner.handle || "?")[0].toUpperCase()}
+                    </span>
+                  )}
+                  <Link
+                    to="/u/$handle"
+                    params={{ handle: owner.handle ?? "unknown" }}
+                    className="font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400"
+                  >
+                    @{owner.handle ?? "unknown"}
+                  </Link>
+                </>
               )}
-            </p>
+            </div>
           </div>
 
           {/* Summary */}
@@ -89,6 +151,30 @@ export function SkillDetailPage({ slug }: { slug: string }) {
               <p className="text-gray-700 dark:text-gray-300">
                 {skill.summary}
               </p>
+            </div>
+          )}
+
+          {/* Star button — only for logged-in users who are NOT the skill owner */}
+          {token && authUser && (!owner || owner.handle !== authUser.handle) && (
+            <div className="mb-6">
+              <button
+                onClick={handleToggleStar}
+                disabled={starring}
+                className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
+                  isStarred
+                    ? "border-yellow-300 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 dark:border-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-300 dark:hover:bg-yellow-900/50"
+                    : "border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-800"
+                }`}
+              >
+                <Star
+                  size={16}
+                  className={isStarred ? "fill-yellow-500 text-yellow-500" : ""}
+                />
+                {isStarred ? "Starred" : "Star"}
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {formatNumber(stars)}
+                </span>
+              </button>
             </div>
           )}
 
@@ -159,6 +245,12 @@ export function SkillDetailPage({ slug }: { slug: string }) {
                   <Star size={14} /> Stars
                 </span>
                 <span>{formatNumber(stars)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Eye size={14} /> Views
+                </span>
+                <span>{formatNumber(views)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1">

@@ -61,6 +61,7 @@ export interface SkillListItem {
   createdAt: number;
   updatedAt: number;
   latestVersion: LatestVersion | null;
+  owner: Owner | null;
 }
 
 export interface SkillListResponse {
@@ -128,6 +129,11 @@ export interface SearchResult {
   summary: string | null;
   version: string | null;
   updatedAt: number | null;
+  downloads: number;
+  stars: number;
+  views: number;
+  ownerHandle: string | null;
+  ownerImage: string | null;
 }
 
 export interface SearchResponse {

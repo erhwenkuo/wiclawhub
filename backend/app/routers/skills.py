@@ -48,6 +48,17 @@ from app.services import skill_service
 router = APIRouter()
 
 
+@router.get("/skills/count", tags=["skills"], summary="Count skills", description="Return total number of published skills.")
+async def count_skills(
+    nonSuspiciousOnly: bool = Query(False),
+    nonSuspicious: bool = Query(False),
+    session: AsyncSession = Depends(get_session),
+):
+    non_sus = nonSuspiciousOnly or nonSuspicious
+    total = await skill_service.count_skills(session, non_suspicious_only=non_sus)
+    return {"total": total}
+
+
 @router.get("/skills", response_model=SkillListResponse, tags=["skills"], summary="List skills", description="Paginated list of published skills with optional suspicious-content filter.")
 async def list_skills(
     limit: int = Query(20, ge=1, le=100),
@@ -55,6 +66,7 @@ async def list_skills(
     nonSuspiciousOnly: bool = Query(False),
     nonSuspicious: bool = Query(False),
     owner: str | None = Query(None),
+    sort: str = Query("updated"),
     session: AsyncSession = Depends(get_session),
     current_user: User | None = Depends(get_optional_user),
 ):
@@ -63,7 +75,7 @@ async def list_skills(
     if owner == "me" and current_user:
         owner_id = current_user.id
     items, next_cursor = await skill_service.list_skills(
-        session, limit=limit, cursor=cursor, non_suspicious_only=non_sus, owner_id=owner_id
+        session, limit=limit, cursor=cursor, non_suspicious_only=non_sus, owner_id=owner_id, sort=sort
     )
     return SkillListResponse(
         items=[
@@ -76,6 +88,11 @@ async def list_skills(
                 createdAt=i["skill"].created_at,
                 updatedAt=i["skill"].updated_at,
                 latestVersion=_to_latest(i["latestVersion"]),
+                owner=Owner(
+                    handle=i["owner"].handle if i["owner"] else None,
+                    displayName=i["owner"].display_name if i["owner"] else None,
+                    image=i["owner"].image if i["owner"] else None,
+                ) if i.get("owner") else None,
             )
             for i in items
         ],
@@ -179,9 +196,10 @@ async def publish_skill(
 @router.get("/skills/{slug}", response_model=SkillResponse, tags=["skills"], summary="Get skill details", description="Return full detail for a single skill including owner, moderation, and latest version.")
 async def get_skill(
     slug: str,
+    view: bool = Query(True),
     session: AsyncSession = Depends(get_session),
 ):
-    data = await skill_service.get_skill(session, slug)
+    data = await skill_service.get_skill(session, slug, increment_view=view)
     if data is None:
         raise HTTPException(status_code=404, detail="Skill not found")
 

@@ -5,8 +5,9 @@ from app.models.skill_moderation import SkillModeration
 from app.models.file_storage import FileStorage
 from app.models.oauth_account import OAuthAccount
 from app.models.refresh_token import RefreshToken
+from app.models.star import Star
 
 __all__ = [
     "User", "Skill", "SkillVersion", "SkillModeration", "FileStorage",
-    "OAuthAccount", "RefreshToken",
+    "OAuthAccount", "RefreshToken", "Star",
 ]

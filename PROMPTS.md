@@ -28,4 +28,6 @@ API　的　Spec　要與“https://github.com/openclaw/clawhub/blob/main/public
 請先將實作計劃放到 PLAN.md 下并設計成多個 milestones, 并增加 README.md 來說明整個專案的背景與使用細節。實作與專案的描述可放置在 CLAUDE.md。　開發環境是使用 uv 來管理, 使用 Python 的動作前使用 "source .venv/bin/activate" 來啟動環境。
 
 　
+## 目標
 
+在

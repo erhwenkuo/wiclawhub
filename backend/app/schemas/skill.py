@@ -28,6 +28,7 @@ class SkillListItem(BaseModel):
     createdAt: float
     updatedAt: float
     latestVersion: LatestVersion | None = None
+    owner: Owner | None = None
 
 
 class SkillListResponse(BaseModel):
