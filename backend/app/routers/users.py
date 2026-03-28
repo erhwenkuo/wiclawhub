@@ -94,7 +94,7 @@ async def get_user_profile(
     }
 
 
-@router.post("/skills/{slug}/star", tags=["stars"], summary="Star a skill")
+@router.post("/stars/{slug}", tags=["stars"], summary="Star a skill")
 async def star_skill(
     slug: str,
     user: User = Depends(get_current_user),
@@ -112,7 +112,7 @@ async def star_skill(
         select(Star).where(Star.user_id == user.id, Star.skill_id == skill.id)
     )
     if existing.scalars().first() is not None:
-        return {"ok": True, "starred": True}
+        return {"ok": True, "starred": True, "alreadyStarred": True}
 
     session.add(Star(user_id=user.id, skill_id=skill.id))
 
@@ -123,10 +123,10 @@ async def star_skill(
     session.add(skill)
     await session.commit()
 
-    return {"ok": True, "starred": True}
+    return {"ok": True, "starred": True, "alreadyStarred": False}
 
 
-@router.delete("/skills/{slug}/star", tags=["stars"], summary="Unstar a skill")
+@router.delete("/stars/{slug}", tags=["stars"], summary="Unstar a skill")
 async def unstar_skill(
     slug: str,
     user: User = Depends(get_current_user),
@@ -144,7 +144,7 @@ async def unstar_skill(
     )
     star_row = existing.scalars().first()
     if star_row is None:
-        return {"ok": True, "starred": False}
+        return {"ok": True, "unstarred": False, "alreadyUnstarred": True}
 
     await session.delete(star_row)
 
@@ -155,10 +155,10 @@ async def unstar_skill(
     session.add(skill)
     await session.commit()
 
-    return {"ok": True, "starred": False}
+    return {"ok": True, "unstarred": True, "alreadyUnstarred": False}
 
 
-@router.get("/skills/{slug}/star", tags=["stars"], summary="Check if current user starred a skill")
+@router.get("/stars/{slug}", tags=["stars"], summary="Check if current user starred a skill")
 async def check_star(
     slug: str,
     user: User = Depends(get_current_user),

@@ -1,14 +1,19 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Look for .env in backend/ first, then project root
+_env_files = [f for f in [Path(".env"), Path("../.env")] if f.is_file()]
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_env_files or ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
-    PROJECT_NAME: str = "WiClawHub"
+    SKILL_SITE_NAME: str = "WiClawHub"
     API_V1_PREFIX: str = "/api/v1"
     DEBUG: bool = False
 

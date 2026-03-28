@@ -49,7 +49,7 @@ export function SkillDetailPage({ slug }: { slug: string }) {
   const { data: starData } = useQuery<{ starred: boolean }>({
     queryKey: ["star-check", slug],
     queryFn: () =>
-      apiFetch(`/skills/${slug}/star`, {
+      apiFetch(`/stars/${slug}`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
     enabled: !!token,
@@ -62,7 +62,7 @@ export function SkillDetailPage({ slug }: { slug: string }) {
     setStarring(true);
     try {
       const method = isStarred ? "DELETE" : "POST";
-      await apiFetch(`/skills/${slug}/star`, {
+      await apiFetch(`/stars/${slug}`, {
         method,
         headers: { Authorization: `Bearer ${token}` },
       });

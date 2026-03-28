@@ -12,9 +12,10 @@ import { LoginPage } from "./routes/login";
 import { SignUpPage } from "./routes/signup";
 import { AuthCallbackPage } from "./routes/authCallback";
 import { DashboardPage } from "./routes/dashboard";
-import { UploadPage } from "./routes/upload";
+import { UploadPage } from "./routes/publish-skill";
 import { SettingsPage } from "./routes/settings";
 import { UserProfilePage } from "./routes/userProfile";
+import { CliAuthPage } from "./routes/cliAuth";
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -71,10 +72,13 @@ const dashboardRoute = createRoute({
   component: DashboardPage,
 });
 
-const uploadRoute = createRoute({
+const publishSkillRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/upload",
+  path: "/publish-skill",
   component: UploadPage,
+  validateSearch: (search: Record<string, unknown>): { updateSlug?: string } => ({
+    updateSlug: (search.updateSlug as string) || undefined,
+  }),
 });
 
 const settingsRoute = createRoute({
@@ -92,6 +96,12 @@ const userProfileRoute = createRoute({
   },
 });
 
+const cliAuthRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cli/auth",
+  component: CliAuthPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   skillsRoute,
@@ -101,7 +111,8 @@ export const routeTree = rootRoute.addChildren([
   signupRoute,
   authCallbackRoute,
   dashboardRoute,
-  uploadRoute,
+  publishSkillRoute,
   settingsRoute,
   userProfileRoute,
+  cliAuthRoute,
 ]);

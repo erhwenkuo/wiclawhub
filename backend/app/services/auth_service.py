@@ -102,6 +102,7 @@ async def get_or_create_oauth_user(
     provider_account_id: str,
     email: str | None,
     name: str | None,
+    handle: str | None,
     avatar: str | None,
     session: AsyncSession,
 ) -> tuple[User, str, str]:
@@ -116,6 +117,12 @@ async def get_or_create_oauth_user(
 
     if oauth_account:
         user = await session.get(User, oauth_account.user_id)
+        # Backfill handle if missing
+        if user and not user.handle and handle:
+            user.handle = handle
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
     else:
         # Check if a user with this email already exists
         user = None
@@ -126,11 +133,18 @@ async def get_or_create_oauth_user(
         if user is None:
             user = User(
                 email=email,
+                handle=handle,
                 display_name=name,
                 image=avatar,
                 auth_provider=provider,
                 email_verified=bool(email),
             )
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+        elif not user.handle and handle:
+            # Backfill handle for existing user linked by email
+            user.handle = handle
             session.add(user)
             await session.commit()
             await session.refresh(user)

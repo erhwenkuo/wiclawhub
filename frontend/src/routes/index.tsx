@@ -1,18 +1,20 @@
 import { Link } from "@tanstack/react-router";
 import { useSkills } from "@/lib/hooks";
+import { useSiteConfig } from "@/lib/siteConfig";
 import { SkillCard } from "@/components/SkillCard";
 import { Spinner } from "@/components/Spinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 
 export function HomePage() {
   const { data, isLoading, error, refetch } = useSkills(6);
+  const { siteName } = useSiteConfig();
 
   return (
     <div className="flex flex-col gap-12 py-8">
       {/* Hero */}
       <section className="flex flex-col items-center gap-4 text-center">
         <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-gray-50">
-          WiClawHub
+          {siteName}
         </h1>
         <p className="max-w-md text-lg text-gray-600 dark:text-gray-400">
           Publish, version, and search text-based agent skills.

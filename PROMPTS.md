@@ -30,4 +30,11 @@ API　的　Spec　要與“https://github.com/openclaw/clawhub/blob/main/public
 　
 ## 目標
 
-在
+Implement a "Broswer Flow" authentication feature, which allow clawhub cli (REf. https://github.com/openclaw/openclaw/blob/main/docs/tools/clawhub.md) to 
+
+In the ClawHub CLI, the "browser flow" refers to the default authentication process used when user run the `clawhub login` command in console. 
+
+It allows user to securely link your local command-line environment to user's ClawHub account using user's web browser rather than manually typing in long API tokens.
+
+The feature is to implement "Broser Flow" authtication. And use `npx clawhub@latest --site {front-end url} login` to test. 
+

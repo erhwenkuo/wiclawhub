@@ -11,10 +11,12 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { useSiteConfig } from "@/lib/siteConfig";
 
 export function RootLayout() {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
+  const { siteName } = useSiteConfig();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -34,7 +36,7 @@ export function RootLayout() {
       <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link to="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-            WiClawHub
+            {siteName}
           </Link>
 
           <nav className="flex items-center gap-4 sm:gap-5">
@@ -46,7 +48,7 @@ export function RootLayout() {
             </Link>
             {user && (
               <Link
-                to="/upload"
+                to="/publish-skill"
                 className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
               >
                 Upload
@@ -105,7 +107,7 @@ export function RootLayout() {
                       Dashboard
                     </Link>
                     <Link
-                      to="/upload"
+                      to="/publish-skill"
                       onClick={() => setMenuOpen(false)}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
                     >
@@ -152,7 +154,7 @@ export function RootLayout() {
       </main>
 
       <footer className="border-t border-gray-200 bg-white py-6 text-center text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-500">
-        WiClawHub &copy; {new Date().getFullYear()}
+        {siteName} &copy; {new Date().getFullYear()}
       </footer>
     </div>
   );

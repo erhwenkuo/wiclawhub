@@ -1,110 +1,140 @@
 # WiClawHub
 
-WiClawHub 是一個技能（Skill）註冊與管理平台，靈感來自 [ClawHub](https://clawhub.ai/)。提供技能的發布、版本管理、搜尋與下載功能，API 與 ClawHub OpenAPI v1 規格完全相容。
+WiClawHub is a skill registration and management platform inspired by [ClawHub](https://clawhub.ai/). It provides skill publishing, version management, search, and download capabilities, with an API fully compatible with the ClawHub OpenAPI v1 spec.
 
-## 功能特色
+## Why Build This
 
-- **技能管理** — 發布、更新、刪除、恢復技能
-- **語意化版本控制** — 每次發布產生新版本，附帶 changelog
-- **全文搜尋** — 依關鍵字搜尋技能
-- **檔案管理** — 技能可包含多個檔案，支援線上瀏覽與下載
-- **安全掃描** — 自動掃描技能檔案安全性
-- **審核系統** — 標記可疑或惡意技能
-- **使用者認證** — Email/密碼註冊登入、GitHub OAuth、Google OAuth、API token
-- **JWT Session** — 短期 access token + 可輪替 refresh token
-- **Rate Limiting** — 讀取 120/min，寫入 30/min
+Using public Skill Hubs (e.g., [ClawHub](https://clawhub.ai/), [SkillHub](https://www.skillhub.club/)) to create or download "skills" raises serious security concerns, primarily because these public platforms are vulnerable to large-scale supply chain attacks and malware infiltration.
 
-## 技術架構
+Enterprises build self-hosted agent Skill Hubs to transform scattered AI capabilities into manageable, reusable, and secure corporate assets.
+
+Key reasons:
+
+1. **Security & Data Sovereignty**
+   - **Private Logic Protection**: Enterprise skills often contain sensitive business logic, API keys, or internal system access. Self-hosted deployment ensures that skill definitions never leak to public clouds.
+   - **Access Control (RBAC)**: A self-hosted Skill Hub enables fine-grained control over who (which department or AI agent) can invoke specific high-privilege skills (e.g., HR changes or financial transfers).
+
+2. **Governance & Standardization**
+   - **Single Source of Truth**: Prevents departments from independently developing duplicate skills (e.g., three different versions of "query inventory"). The registry ensures the entire organization uses verified, quality-consistent skill versions.
+   - **Version Management**: When backend APIs update, the Skill Registry enables version switching (v1.0 to v2.0), ensuring production AI agents don't break due to underlying tool changes.
+
+3. **Operational Efficiency & Discoverability**
+   - **Cross-Team Sharing**: Developers simply "register" their Python scripts or API tools, and AI agents across other departments can immediately discover and use them, maximizing development ROI.
+   - **Token Optimization**: No need to stuff all tool descriptions into prompts. AI agents can dynamically retrieve and load relevant skills from the Skill Registry based on the current task, saving tokens and improving accuracy.
+
+4. **Compliance & Auditing**
+   - **Complete Logging**: A self-hosted hub can fully record "who called which skill, when, with what input and output" — a requirement for passing compliance audits in highly regulated industries like finance and healthcare.
+   - **Stability Monitoring**: Enterprises can monitor call success rates and latency for specific skills, and promptly fix broken internal integration points.
+
+5. **Custom Business Domain Knowledge**
+   - **Proprietary Workflows**: General-purpose AI (e.g., ChatGPT) doesn't understand proprietary internal processes. A Skill Hub allows enterprises to package complex SOPs (e.g., "onboarding review process" or "patent search logic") into standardized skills, giving AI real business execution capability.
+
+## Features
+
+- **Skill Management** — Publish, update, delete, and restore skills
+- **Semantic Versioning** — Each publish creates a new version with a changelog
+- **Full-Text Search** — Search skills by keyword
+- **File Management** — Skills can contain multiple files with online browsing and download
+- **Security Scanning** — Automatic security scanning of skill files
+- **Moderation System** — Flag suspicious or malicious skills
+- **User Authentication** — Email/password registration and login, GitHub OAuth, Google OAuth, API token
+- **JWT Sessions** — Short-lived access tokens + rotatable refresh tokens
+- **Rate Limiting** — Read 120/min, Write 30/min
+
+## Tech Stack
 
 ### Backend
 
-| 元件 | 技術 | 用途 |
-|------|------|------|
-| Web Framework | FastAPI | 高效能 API 框架 |
-| Database | SQLite (預設) / PostgreSQL | 持久化資料儲存 |
-| ORM | SQLAlchemy / SQLModel | 資料庫互動與資料建模 |
-| Data Validation | Pydantic | 型別安全的請求/回應驗證 |
-| Server | Uvicorn | ASGI 伺服器 |
-| Migration | Alembic | 資料庫遷移 |
-| Auth | bcrypt + python-jose | 密碼雜湊 + JWT |
-| HTTP Client | httpx | OAuth token 交換 |
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| Web Framework | FastAPI | High-performance API framework |
+| Database | SQLite (default) / PostgreSQL | Persistent data storage |
+| ORM | SQLAlchemy / SQLModel | Database interaction and data modeling |
+| Data Validation | Pydantic | Type-safe request/response validation |
+| Server | Uvicorn | ASGI server |
+| Migration | Alembic | Database migrations |
+| Auth | bcrypt + python-jose | Password hashing + JWT |
+| HTTP Client | httpx | OAuth token exchange |
 
 ### Frontend
 
-| 元件 | 技術 | 用途 |
-|------|------|------|
-| Framework | TanStack Router + React | SPA 路由框架 |
-| Build Tool | Vite | 快速開發建置工具 |
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| Framework | TanStack Router + React | SPA routing framework |
+| Build Tool | Vite | Fast development build tool |
 | Styling | Tailwind CSS | Utility-first CSS |
-| Code Editor | Monaco Editor | 線上程式碼檢視 |
-| Markdown | react-markdown | Markdown 渲染 |
-| Icons | lucide-react | 圖示庫 |
+| Code Editor | Monaco Editor | Online code viewer |
+| Markdown | react-markdown | Markdown rendering |
+| Icons | lucide-react | Icon library |
 
-## 快速開始
+## Quick Start
 
-### 前置需求
+### Prerequisites
 
 - Python 3.13+
-- [uv](https://docs.astral.sh/uv/) (Python 套件管理)
-- Node.js 20+ (前端套件管理)
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
+- Node.js 20+ (frontend package management)
 
-### Backend 啟動
+### Backend Setup
 
 ```bash
-# 啟動虛擬環境
+# Activate virtual environment
 source .venv/bin/activate
 
-# 安裝 backend 依賴
+# Install backend dependencies
 cd backend
 uv pip install -e ".[dev]"
 
-# 執行資料庫遷移
+# Run database migrations
 alembic upgrade head
 
-# 啟動開發伺服器
+# Start development server
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend 啟動
+### Frontend Setup
 
 ```bash
 cd frontend
 
-# 安裝依賴
+# Install dependencies
 npm install
 
-# 啟動開發伺服器
+# Start development server
 npm run dev
 ```
 
-### 環境變數
+### Environment Variables
 
-複製 `.env.example` 為 `.env` 並修改：
+Copy `.env.example` to `.env` and modify:
 
 ```env
-# Database (預設使用 SQLite，需使用 async driver)
+# Site name (displayed in header, footer, and home page)
+# SKILL_SITE_NAME=WiClawHub
+
+# Database (defaults to SQLite, requires async driver)
 DATABASE_URL=sqlite+aiosqlite:///./wiclawhub.db
 
-# 切換為 PostgreSQL
+# Switch to PostgreSQL
 # DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/wiclawhub
 
 # Auth
 SECRET_KEY=your-secret-key
 
-# JWT (預設使用 SECRET_KEY)
+# JWT (defaults to SECRET_KEY)
 # JWT_SECRET_KEY=
 # JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 # JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 
-# OAuth - GitHub (至 GitHub Developer Settings 建立 OAuth App)
+# OAuth - GitHub (create an OAuth App in GitHub Developer Settings)
 # GITHUB_CLIENT_ID=
 # GITHUB_CLIENT_SECRET=
 
-# OAuth - Google (至 Google Cloud Console 建立 OAuth 2.0 憑證)
+# OAuth - Google (create OAuth 2.0 credentials in Google Cloud Console)
 # GOOGLE_CLIENT_ID=
 # GOOGLE_CLIENT_SECRET=
 
-# Frontend URL (OAuth callback 用)
+# Frontend URL (for OAuth callbacks)
 FRONTEND_URL=http://localhost:5173
 
 # Rate limiting (requests per minute)
@@ -112,68 +142,68 @@ RATE_LIMIT_READ=120
 RATE_LIMIT_WRITE=30
 ```
 
-## API 文件
+## API Documentation
 
-啟動後端後，存取：
+After starting the backend, visit:
 
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 - OpenAPI JSON: `http://localhost:8000/openapi.json`
 
-## API 端點概覽
+## API Endpoints
 
-| 方法 | 路徑 | 說明 | 認證 |
-|------|------|------|------|
-| GET | `/api/v1/search` | 搜尋技能 | - |
-| GET | `/api/v1/resolve` | 依 hash 解析版本 | - |
-| GET | `/api/v1/skills` | 列出技能 | - |
-| POST | `/api/v1/skills` | 發布技能版本 | Bearer |
-| GET | `/api/v1/skills/{slug}` | 取得技能 | - |
-| DELETE | `/api/v1/skills/{slug}` | 軟刪除技能 | Bearer |
-| POST | `/api/v1/skills/{slug}/undelete` | 恢復刪除 | Bearer |
-| GET | `/api/v1/skills/{slug}/versions` | 列出版本 | - |
-| GET | `/api/v1/skills/{slug}/versions/{version}` | 取得特定版本 | - |
-| GET | `/api/v1/skills/{slug}/moderation` | 取得審核資訊 | - |
-| GET | `/api/v1/skills/{slug}/scan` | 安全掃描詳情 | - |
-| GET | `/api/v1/skills/{slug}/file` | 取得原始檔案 | - |
-| GET | `/api/v1/download` | 下載 zip | - |
-| GET | `/api/v1/whoami` | 當前使用者 | Bearer |
-| POST | `/api/v1/auth/register` | Email/密碼註冊 | - |
-| POST | `/api/v1/auth/login` | Email/密碼登入 | - |
-| POST | `/api/v1/auth/refresh` | 刷新 access token | - |
-| POST | `/api/v1/auth/logout` | 登出 (撤銷 refresh token) | Bearer |
-| GET | `/api/v1/auth/oauth/{provider}/authorize` | 開始 OAuth 流程 | - |
-| GET | `/api/v1/auth/oauth/{provider}/callback` | OAuth 回呼 | - |
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| GET | `/api/v1/search` | Search skills | - |
+| GET | `/api/v1/resolve` | Resolve version by hash | - |
+| GET | `/api/v1/skills` | List skills | - |
+| POST | `/api/v1/skills` | Publish skill version | Bearer |
+| GET | `/api/v1/skills/{slug}` | Get skill | - |
+| DELETE | `/api/v1/skills/{slug}` | Soft-delete skill | Bearer |
+| POST | `/api/v1/skills/{slug}/undelete` | Restore deleted skill | Bearer |
+| GET | `/api/v1/skills/{slug}/versions` | List versions | - |
+| GET | `/api/v1/skills/{slug}/versions/{version}` | Get specific version | - |
+| GET | `/api/v1/skills/{slug}/moderation` | Get moderation info | - |
+| GET | `/api/v1/skills/{slug}/scan` | Security scan details | - |
+| GET | `/api/v1/skills/{slug}/file` | Get raw file | - |
+| GET | `/api/v1/download` | Download zip | - |
+| GET | `/api/v1/whoami` | Current user | Bearer |
+| POST | `/api/v1/auth/register` | Email/password registration | - |
+| POST | `/api/v1/auth/login` | Email/password login | - |
+| POST | `/api/v1/auth/refresh` | Refresh access token | - |
+| POST | `/api/v1/auth/logout` | Logout (revoke refresh token) | Bearer |
+| GET | `/api/v1/auth/oauth/{provider}/authorize` | Start OAuth flow | - |
+| GET | `/api/v1/auth/oauth/{provider}/callback` | OAuth callback | - |
 
-## 專案結構
+## Project Structure
 
 ```
 wiclawhub/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI 應用程式入口
-│   │   ├── config.py         # 設定管理
-│   │   ├── database.py       # 資料庫連線
-│   │   ├── models/           # SQLModel 資料模型
-│   │   ├── schemas/          # Pydantic 請求/回應模型
-│   │   ├── routers/          # API 路由
-│   │   ├── services/         # 業務邏輯
-│   │   └── auth/             # 認證
-│   ├── tests/                # 測試
-│   ├── alembic/              # 資料庫遷移
+│   │   ├── main.py          # FastAPI application entry point
+│   │   ├── config.py         # Configuration management
+│   │   ├── database.py       # Database connection
+│   │   ├── models/           # SQLModel data models
+│   │   ├── schemas/          # Pydantic request/response models
+│   │   ├── routers/          # API routes
+│   │   ├── services/         # Business logic
+│   │   └── auth/             # Authentication
+│   ├── tests/                # Tests
+│   ├── alembic/              # Database migrations
 │   └── pyproject.toml
 ├── frontend/
 │   ├── src/
-│   │   ├── routes/           # 頁面路由
-│   │   ├── components/       # React 元件
-│   │   ├── lib/              # 工具函式
-│   │   └── styles.css        # 全域樣式
+│   │   ├── routes/           # Page routes
+│   │   ├── components/       # React components
+│   │   ├── lib/              # Utility functions
+│   │   └── styles.css        # Global styles
 │   └── package.json
-├── PLAN.md                   # 實作計劃
-├── CLAUDE.md                 # 開發說明
-└── README.md                 # 本文件
+├── PLAN.md                   # Implementation plan
+├── CLAUDE.md                 # Development guide
+└── README.md                 # This file
 ```
 
-## 授權
+## License
 
 MIT License

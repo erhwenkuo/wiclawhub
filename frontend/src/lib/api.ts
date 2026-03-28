@@ -138,4 +138,5 @@ export interface SearchResult {
 
 export interface SearchResponse {
   results: SearchResult[];
+  hasMore: boolean;
 }

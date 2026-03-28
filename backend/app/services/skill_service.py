@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.config import settings
 from app.models.skill import Skill
 from app.models.skill_moderation import SkillModeration
 from app.models.skill_version import SkillVersion
@@ -410,12 +411,179 @@ async def get_file_content(
 async def search_skills(
     session: AsyncSession,
     q: str = "",
-    limit: int = 100,
+    limit: int = 20,
+    offset: int = 0,
     sort: str = "updated",
     highlighted_only: bool = False,
     non_suspicious_only: bool = False,
 ) -> list[dict]:
-    query = select(Skill).where(Skill.is_deleted == False)  # noqa: E712
+    search_term = q.strip()
+
+    if search_term:
+        if settings.is_sqlite:
+            skills_with_rank = await _search_fts5(session, search_term, limit, offset, non_suspicious_only)
+        else:
+            skills_with_rank = await _search_tsvector(session, search_term, limit, offset, non_suspicious_only)
+    else:
+        skills_with_rank = await _search_fallback(session, limit, offset, non_suspicious_only)
+
+    items = []
+    for skill, rank_score in skills_with_rank:
+        latest = await _get_latest_version(session, skill.id)
+        owner = await _get_owner(session, skill.owner_id)
+
+        stats = skill.stats or {}
+        items.append({
+            "score": rank_score,
+            "slug": skill.slug,
+            "displayName": skill.display_name,
+            "summary": skill.summary,
+            "version": latest.version if latest else None,
+            "updatedAt": skill.updated_at,
+            "downloads": stats.get("downloads", 0),
+            "stars": stats.get("stars", 0),
+            "views": stats.get("views", 0),
+            "ownerHandle": owner.handle if owner else None,
+            "ownerImage": owner.image if owner else None,
+        })
+
+    if sort == "downloads":
+        items.sort(key=lambda x: x["downloads"], reverse=True)
+
+    return items
+
+
+async def _search_fts5(
+    session: AsyncSession,
+    q: str,
+    limit: int,
+    offset: int,
+    non_suspicious_only: bool,
+) -> list[tuple[Skill, float]]:
+    """Full-text search using SQLite FTS5."""
+    # Tokenize: split on non-alphanumeric, filter empty, build FTS5 query
+    import re
+    tokens = [t for t in re.split(r"[^a-zA-Z0-9]+", q) if t]
+    if not tokens:
+        return await _search_like_fallback(session, q, limit, offset, non_suspicious_only)
+    # Match each token as prefix (word*) joined with implicit AND
+    fts_query = " ".join(f'"{t}"*' for t in tokens)
+
+    # Get matching rowids and scores from FTS5
+    sql = text(
+        "SELECT fts.rowid AS rid, -fts.rank AS score "
+        "FROM skills_fts fts "
+        "WHERE skills_fts MATCH :q "
+        "ORDER BY fts.rank "
+        "LIMIT :limit OFFSET :offset"
+    )
+    result = await session.execute(sql, {"q": fts_query, "limit": limit, "offset": offset})
+    fts_rows = result.mappings().all()
+
+    if not fts_rows:
+        return await _search_like_fallback(session, q, limit, offset, non_suspicious_only)
+
+    # Load actual Skill objects by rowid
+    rowid_to_score = {row["rid"]: float(row["score"]) for row in fts_rows}
+    rowids = list(rowid_to_score.keys())
+
+    # SQLite rowid lookup via raw SQL, then load Skills by slug
+    slug_result = await session.execute(
+        text("SELECT rowid, slug FROM skills WHERE rowid IN ({})".format(
+            ",".join(str(r) for r in rowids)
+        ))
+    )
+    rowid_slug_map = {row[0]: row[1] for row in slug_result}
+
+    slugs = list(rowid_slug_map.values())
+    skill_result = await session.execute(
+        select(Skill).where(Skill.slug.in_(slugs), Skill.is_deleted == False)  # noqa: E712
+    )
+    skill_map = {s.slug: s for s in skill_result.scalars().all()}
+
+    skills_with_rank: list[tuple[Skill, float]] = []
+    q_lower = q.lower()
+    for rowid in rowids:
+        slug = rowid_slug_map.get(rowid)
+        if not slug or slug not in skill_map:
+            continue
+        skill = skill_map[slug]
+        score = rowid_to_score[rowid]
+        # Boost exact/partial slug match
+        if skill.slug.lower() == q_lower:
+            score += 100.0
+        elif q_lower in skill.slug.lower():
+            score += 10.0
+        skills_with_rank.append((skill, score))
+
+    if non_suspicious_only:
+        skills_with_rank = await _filter_suspicious(session, skills_with_rank)
+
+    return skills_with_rank
+
+
+async def _search_tsvector(
+    session: AsyncSession,
+    q: str,
+    limit: int,
+    offset: int,
+    non_suspicious_only: bool,
+) -> list[tuple[Skill, float]]:
+    """Full-text search using PostgreSQL tsvector."""
+    # Get matching skill slugs and scores
+    sql = text(
+        "SELECT s.slug, ts_rank(s.search_vector, query) AS score "
+        "FROM skills s, plainto_tsquery('english', :q) query "
+        "WHERE s.search_vector @@ query AND s.is_deleted = false "
+        "ORDER BY score DESC "
+        "LIMIT :limit OFFSET :offset"
+    )
+    result = await session.execute(sql, {"q": q, "limit": limit, "offset": offset})
+    rows = result.mappings().all()
+
+    if not rows:
+        return await _search_like_fallback(session, q, limit, offset, non_suspicious_only)
+
+    slug_to_score = {row["slug"]: float(row["score"]) for row in rows}
+    slugs = list(slug_to_score.keys())
+
+    skill_result = await session.execute(
+        select(Skill).where(Skill.slug.in_(slugs), Skill.is_deleted == False)  # noqa: E712
+    )
+    skill_map = {s.slug: s for s in skill_result.scalars().all()}
+
+    skills_with_rank: list[tuple[Skill, float]] = []
+    for slug in slugs:
+        if slug in skill_map:
+            skills_with_rank.append((skill_map[slug], slug_to_score[slug]))
+
+    if non_suspicious_only:
+        skills_with_rank = await _filter_suspicious(session, skills_with_rank)
+
+    return skills_with_rank
+
+
+async def _search_like_fallback(
+    session: AsyncSession,
+    q: str,
+    limit: int,
+    offset: int,
+    non_suspicious_only: bool,
+) -> list[tuple[Skill, float]]:
+    """ILIKE fallback when FTS returns no results (e.g. partial substring match)."""
+    search_term = f"%{q}%"
+    query = (
+        select(Skill)
+        .where(Skill.is_deleted == False)  # noqa: E712
+        .where(
+            (Skill.slug.ilike(search_term))
+            | (Skill.display_name.ilike(search_term))
+            | (Skill.summary.ilike(search_term))
+        )
+        .order_by(Skill.updated_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
 
     if non_suspicious_only:
         suspicious_ids = select(SkillModeration.skill_id).where(
@@ -423,55 +591,65 @@ async def search_skills(
         )
         query = query.where(Skill.id.notin_(suspicious_ids))
 
-    if q.strip():
-        search_term = f"%{q}%"
-        query = query.where(
-            (Skill.slug.ilike(search_term))
-            | (Skill.display_name.ilike(search_term))
-            | (Skill.summary.ilike(search_term))
-        )
-
-    query = query.order_by(Skill.updated_at.desc()).limit(limit)
-
     result = await session.execute(query)
     skills = list(result.scalars().all())
 
-    items = []
+    q_lower = q.lower()
+    scored: list[tuple[Skill, float]] = []
     for skill in skills:
-        latest = await _get_latest_version(session, skill.id)
-        owner = await _get_owner(session, skill.owner_id)
-
         score = 1.0
-        if q.strip():
-            if q.lower() in (skill.slug or "").lower():
-                score = 2.0
-            if q.lower() == (skill.slug or "").lower():
-                score = 3.0
+        if q_lower in (skill.slug or "").lower():
+            score = 2.0
+        if q_lower == (skill.slug or "").lower():
+            score = 3.0
+        scored.append((skill, score))
 
-        stats = skill.stats or {}
-        downloads = stats.get("downloads", 0)
-        stars = stats.get("stars", 0)
-        views = stats.get("views", 0)
-        items.append({
-            "score": score,
-            "slug": skill.slug,
-            "displayName": skill.display_name,
-            "summary": skill.summary,
-            "version": latest.version if latest else None,
-            "updatedAt": skill.updated_at,
-            "downloads": downloads,
-            "stars": stars,
-            "views": views,
-            "ownerHandle": owner.handle if owner else None,
-            "ownerImage": owner.image if owner else None,
-        })
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return scored
 
-    if sort == "downloads":
-        items.sort(key=lambda x: x["downloads"], reverse=True)
-    elif q.strip():
-        items.sort(key=lambda x: x["score"], reverse=True)
 
-    return items
+async def _search_fallback(
+    session: AsyncSession,
+    limit: int,
+    offset: int,
+    non_suspicious_only: bool,
+) -> list[tuple[Skill, float]]:
+    """No search query — return all skills sorted by updated_at."""
+    query = (
+        select(Skill)
+        .where(Skill.is_deleted == False)  # noqa: E712
+        .order_by(Skill.updated_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+
+    if non_suspicious_only:
+        suspicious_ids = select(SkillModeration.skill_id).where(
+            SkillModeration.is_suspicious == True  # noqa: E712
+        )
+        query = query.where(Skill.id.notin_(suspicious_ids))
+
+    result = await session.execute(query)
+    skills = list(result.scalars().all())
+    return [(skill, 1.0) for skill in skills]
+
+
+async def _filter_suspicious(
+    session: AsyncSession,
+    skills_with_rank: list[tuple[Skill, float]],
+) -> list[tuple[Skill, float]]:
+    """Remove suspicious skills from results."""
+    if not skills_with_rank:
+        return skills_with_rank
+    skill_ids = [s.id for s, _ in skills_with_rank]
+    result = await session.execute(
+        select(SkillModeration.skill_id).where(
+            SkillModeration.skill_id.in_(skill_ids),
+            SkillModeration.is_suspicious == True,  # noqa: E712
+        )
+    )
+    suspicious_ids = set(result.scalars().all())
+    return [(s, r) for s, r in skills_with_rank if s.id not in suspicious_ids]
 
 
 async def resolve_version(

@@ -1,4 +1,6 @@
+import hashlib
 import os
+import secrets
 import uuid as uuid_mod
 from pathlib import Path
 from urllib.parse import urlencode
@@ -63,6 +65,31 @@ def _make_auth_response(user: User, access: str, refresh: str) -> AuthTokenRespo
 )
 async def whoami(user: User = Depends(get_current_user)):
     return WhoamiResponse(user=_make_owner(user))
+
+
+# ── CLI Token ──
+
+
+@router.post(
+    "/auth/cli-token",
+    tags=["auth"],
+    summary="Generate API token for CLI",
+    description="Generate a new API token for the authenticated user. Used by CLI browser flow.",
+)
+async def generate_cli_token(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    # Generate a new random API token
+    raw_token = secrets.token_hex(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    # Store the hash on the user
+    user.api_token_hash = token_hash
+    session.add(user)
+    await session.commit()
+
+    return {"token": raw_token}
 
 
 # ── Profile ──
@@ -342,6 +369,7 @@ async def oauth_callback(
 
             provider_id = str(profile["id"])
             name = profile.get("name") or profile.get("login")
+            handle = profile.get("login")
             avatar = profile.get("avatar_url")
             email = primary_email
 
@@ -371,14 +399,20 @@ async def oauth_callback(
 
             provider_id = str(profile["id"])
             name = profile.get("name")
+            handle = None
             avatar = profile.get("picture")
             email = profile.get("email")
+
+    # Derive handle: GitHub login > email prefix > None
+    if not handle and email and "@" in email:
+        handle = email.split("@")[0]
 
     user, access, refresh_tok = await get_or_create_oauth_user(
         provider=provider,
         provider_account_id=provider_id,
         email=email,
         name=name,
+        handle=handle,
         avatar=avatar,
         session=session,
     )

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import {
   apiFetch,
   apiFetchText,
@@ -43,11 +43,25 @@ export function useVersion(slug: string, version: string) {
   });
 }
 
-export function useSearch(q: string, sort = "updated", limit = 100) {
-  const params = new URLSearchParams({ q, sort, limit: String(limit) });
-  return useQuery<SearchResponse>({
-    queryKey: ["search", q, sort, limit],
-    queryFn: () => apiFetch(`/search?${params}`),
+const SEARCH_PAGE_SIZE = 20;
+
+export function useInfiniteSearch(q: string, sort = "updated") {
+  return useInfiniteQuery<SearchResponse>({
+    queryKey: ["search", q, sort],
+    queryFn: ({ pageParam = 0 }) => {
+      const params = new URLSearchParams({
+        q,
+        sort,
+        limit: String(SEARCH_PAGE_SIZE),
+        offset: String(pageParam),
+      });
+      return apiFetch(`/search?${params}`);
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage.hasMore) return undefined;
+      return allPages.reduce((sum, page) => sum + page.results.length, 0);
+    },
   });
 }
 

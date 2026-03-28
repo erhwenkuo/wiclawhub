@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Search as SearchIcon,
@@ -7,8 +7,9 @@ import {
   Box,
   ArrowDown,
   ArrowUp,
+  Loader2,
 } from "lucide-react";
-import { useSearch, useSkillCount } from "@/lib/hooks";
+import { useInfiniteSearch, useSkillCount } from "@/lib/hooks";
 import { formatNumber } from "@/lib/format";
 import { Spinner } from "@/components/Spinner";
 
@@ -21,14 +22,44 @@ export function SearchPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const { data: countData } = useSkillCount();
-  const { data, isLoading } = useSearch(query, sortField);
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteSearch(query, sortField);
 
-  const sorted = useMemo(() => {
-    if (!data?.results) return [];
-    const items = [...data.results];
-    if (sortDir === "asc") items.reverse();
+  // Flatten all pages into a single list
+  const allResults = useMemo(() => {
+    if (!data?.pages) return [];
+    const items = data.pages.flatMap((page) => page.results);
+    if (sortDir === "asc") return [...items].reverse();
     return items;
   }, [data, sortDir]);
+
+  // Intersection observer for infinite scroll
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const handleIntersect = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+    [hasNextPage, isFetchingNextPage, fetchNextPage],
+  );
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(handleIntersect, {
+      rootMargin: "200px",
+    });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [handleIntersect]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -108,17 +139,18 @@ export function SearchPage() {
       {!isLoading && data && (
         <>
           <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-            {sorted.length} result{sorted.length !== 1 ? "s" : ""}
+            {allResults.length} result{allResults.length !== 1 ? "s" : ""}
+            {hasNextPage && "+"}
             {query && <> for &ldquo;{query}&rdquo;</>}
           </p>
 
           <div className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-900">
-            {sorted.length === 0 ? (
+            {allResults.length === 0 ? (
               <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                 No skills found.
               </div>
             ) : (
-              sorted.map((r) => (
+              allResults.map((r) => (
                 <Link
                   key={r.slug}
                   to="/skills/$slug"
@@ -186,6 +218,16 @@ export function SearchPage() {
                   </div>
                 </Link>
               ))
+            )}
+          </div>
+
+          {/* Scroll sentinel — triggers next page fetch */}
+          <div ref={sentinelRef} className="py-4 text-center">
+            {isFetchingNextPage && (
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-400 dark:text-gray-500">
+                <Loader2 size={16} className="animate-spin" />
+                Loading more...
+              </div>
             )}
           </div>
         </>

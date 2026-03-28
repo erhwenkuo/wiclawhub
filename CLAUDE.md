@@ -2,7 +2,7 @@
 
 ## 專案概述
 
-WiClawHub 是一個仿 ClawHub (https://clawhub.ai/) 的技能註冊平台。API spec 須與 ClawHub OpenAPI v1 完全一致。
+WiClawHub 是一個模仿 ClawHub (https://clawhub.ai/) 的技能註冊平台。API spec 須與 ClawHub OpenAPI v1 完全一致。
 
 ## 開發環境
 
@@ -73,7 +73,7 @@ pytest --cov=app                              # 測試 + 覆蓋率
 - `/search` — 搜尋
 - `/dashboard` — 使用者儀表板
 - `/settings` — 設定
-- `/upload` — 發布技能
+- `/publish-skill` — 發布技能
 
 ### 常用指令
 ```bash

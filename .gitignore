@@ -9,19 +9,39 @@ wheels/
 # Virtual environments
 .venv
 
-# Environment
+# Environment (sensitive credentials)
 .env
+.env.local
+.env.*.local
 
 # Database
 *.db
+
+# Test / coverage artifacts
+.coverage
+htmlcov/
+.pytest_cache/
 
 # IDE
 .idea/
 .vscode/
 
+# Claude Code (user-specific settings)
+.claude/
+
 # Node
 node_modules/
 frontend/dist/
 
+# TypeScript build cache
+*.tsbuildinfo
+
+# Uploaded files (avatars, etc.)
+backend/uploads/
+
 # OS
 .DS_Store
+Thumbs.db
+
+# uv lock (large, auto-generated)
+uv.lock
