@@ -1,12 +1,18 @@
 # WiClawHub
 
-WiClawHub is a skill registration and management platform inspired by [ClawHub](https://clawhub.ai/). It provides skill publishing, version management, search, and download capabilities, with an API fully compatible with the ClawHub OpenAPI v1 spec.
+WiClawHub is a entrprise ready & self hosted agent skill registration and management platform inspired by [ClawHub](https://clawhub.ai/). 
+
+It provides skill publishing, version management, search, and download capabilities, with an API fully compatible with the ClawHub OpenAPI v1 spec.
+
+![](./assets/wilclawhub_cover.png)
 
 ## Why Build This
 
 Using public Skill Hubs (e.g., [ClawHub](https://clawhub.ai/), [SkillHub](https://www.skillhub.club/)) to create or download "skills" raises serious security concerns, primarily because these public platforms are vulnerable to large-scale supply chain attacks and malware infiltration.
 
 Enterprises build self-hosted agent Skill Hubs to transform scattered AI capabilities into manageable, reusable, and secure corporate assets.
+
+![](./assets/wiclaw_hub_purpose.png)
 
 Key reasons:
 
@@ -28,6 +34,8 @@ Key reasons:
 
 5. **Custom Business Domain Knowledge**
    - **Proprietary Workflows**: General-purpose AI (e.g., ChatGPT) doesn't understand proprietary internal processes. A Skill Hub allows enterprises to package complex SOPs (e.g., "onboarding review process" or "patent search logic") into standardized skills, giving AI real business execution capability.
+
+
 
 ## Features
 

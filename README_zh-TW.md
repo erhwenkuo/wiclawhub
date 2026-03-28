@@ -1,12 +1,18 @@
 # WiClawHub
 
-WiClawHub 是一個技能（Skill）註冊與管理平台，靈感來自 [ClawHub](https://clawhub.ai/)。提供技能的發布、版本管理、搜尋與下載功能，API 與 ClawHub OpenAPI v1 規格完全相容。
+WiClawHub 是一個企業級、可自建部署的代理人技能註冊與管理平台，靈感來自 [ClawHub](https://clawhub.ai/)。
+
+提供技能的發布、版本管理、搜尋與下載功能，API 與 ClawHub OpenAPI v1 規格完全相容。
+
+![](./assets/wilclawhub_cover.png)
 
 ## 構建原由
 
 使用公開的 Skill Hub(例如 [ClawHub](https://clawhub.ai/), [SkillHub](https://www.skillhub.club/)) 上建立或下載「技能」（Skills）會引發嚴重的安全問題，主要是因為該這些公開的 skill 平台容易遭遇了大規模的供應鏈攻擊與惡意軟體滲透。 
 
 企業建立自地端（Self-hosted）代理人技能樞紐（Skill Hub），主要是為了將分散的 AI 能力轉化為可管理、可複用且安全的企業資產。
+
+![](./assets/wiclaw_hub_purpose.png)
 
 以下是核心原因：
 
@@ -109,6 +115,9 @@ npm run dev
 複製 `.env.example` 為 `.env` 並修改：
 
 ```env
+# 網站名稱（顯示於頁首、頁尾與首頁）
+# SKILL_SITE_NAME=WiClawHub
+
 # Database (預設使用 SQLite，需使用 async driver)
 DATABASE_URL=sqlite+aiosqlite:///./wiclawhub.db
 
