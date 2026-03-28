@@ -1,10 +1,21 @@
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
+</p>
+
 # WiClawHub
 
 WiClawHub is a entrprise ready & self hosted agent skill registration and management platform inspired by [ClawHub](https://clawhub.ai/). 
 
 It provides skill publishing, version management, search, and download capabilities, with an API fully compatible with the ClawHub OpenAPI v1 spec.
 
-![](./assets/wilclawhub_cover.png)
+![](./docs/assets/wilclawhub_cover.png)
+
+## Documentation
+
+- English (default): `README.md` (this file)
+  - [How to use ClawHub cli with WiClawHub](./docs/clawhub_cli.md)
+- Traditional Chinese：[`README_zh-TW.md`](README_zh-TW.md)
+- Simplified Chinese：[`README_zh-CN.md`](README_zh-CN.md)
 
 ## Why Build This
 
@@ -12,7 +23,7 @@ Using public Skill Hubs (e.g., [ClawHub](https://clawhub.ai/), [SkillHub](https:
 
 Enterprises build self-hosted agent Skill Hubs to transform scattered AI capabilities into manageable, reusable, and secure corporate assets.
 
-![](./assets/wiclaw_hub_purpose.png)
+![](./docs/assets/wiclaw_hub_purpose.png)
 
 Key reasons:
 
@@ -211,6 +222,7 @@ wiclawhub/
 ├── CLAUDE.md                 # Development guide
 └── README.md                 # This file
 ```
+
 
 ## License
 

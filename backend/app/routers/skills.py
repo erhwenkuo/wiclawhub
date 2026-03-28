@@ -7,7 +7,7 @@ from zipfile import ZipFile
 
 import yaml
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,18 +102,35 @@ async def list_skills(
 
 @router.post("/skills", response_model=PublishResponse, tags=["skills"], summary="Publish or update a skill", description="Create a new skill or publish a new version. Requires bearer token auth.")
 async def publish_skill(
-    payload: str = Form(...),
-    files: list[UploadFile] = File(default=[]),
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
+    form = await request.form()
+
+    payload = form.get("payload")
     data = json.loads(payload)
     file_entries = data.get("files", [])
+
+    # Collect all uploaded files from the multipart form
+    files: list[UploadFile] = []
+    for key in form.keys():
+        for val in form.getlist(key):
+            if hasattr(val, "filename"):
+                files.append(val)
 
     # Build a path → UploadFile lookup from the multipart files
     uploaded_map: dict[str, UploadFile] = {}
     for uf in files:
         uploaded_map[uf.filename or ""] = uf
+
+    # If payload has no file entries, build them from uploaded files (CLI compat)
+    if not file_entries and files:
+        for uf in files:
+            file_entries.append({
+                "path": uf.filename or "",
+                "contentType": uf.content_type or "application/octet-stream",
+            })
 
     # Read content, compute sha256, store in FileStorage, update metadata
     file_contents: dict[str, bytes] = {}
@@ -173,17 +190,20 @@ async def publish_skill(
         except Exception:
             pass
 
-    skill, sv = await skill_service.create_or_update_skill(
-        session,
-        owner=user,
-        slug=data["slug"],
-        display_name=data["displayName"],
-        version=data["version"],
-        changelog=data["changelog"],
-        files=file_entries,
-        tags=data.get("tags"),
-        summary=summary,
-    )
+    try:
+        skill, sv = await skill_service.create_or_update_skill(
+            session,
+            owner=user,
+            slug=data["slug"],
+            display_name=data["displayName"],
+            version=data["version"],
+            changelog=data["changelog"],
+            files=file_entries,
+            tags=data.get("tags"),
+            summary=summary,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     await session.commit()
 
     return PublishResponse(

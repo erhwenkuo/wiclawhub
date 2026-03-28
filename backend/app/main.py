@@ -72,6 +72,22 @@ async def health_check():
     return {"status": "ok"}
 
 
+@app.get("/.well-known/clawhub.json", tags=["system"])
+async def well_known_clawhub():
+    """Service discovery for ClawHub CLI.
+
+    The CLI uses apiBase as the registry base URL — it appends
+    /api/v1/... paths itself, so apiBase must NOT include /api/v1.
+    """
+    base = settings.FRONTEND_URL.rstrip("/")
+    return {
+        "apiBase": base,
+        "authBase": base,
+        "minCliVersion": "0.1.0",
+        "registry": base,
+    }
+
+
 # --- Custom OpenAPI schema matching ClawHub spec format ---
 
 def custom_openapi():  # type: ignore[no-untyped-def]

@@ -80,6 +80,12 @@ function flattenOuterWrapper(files: UploadFile[]): UploadFile[] {
   return files.map((f) => ({ ...f, path: f.path.slice(prefix.length) }));
 }
 
+const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([\w.-]+))?(?:\+([\w.-]+))?$/;
+
+function isValidSemver(v: string): boolean {
+  return SEMVER_RE.test(v);
+}
+
 const inputCls =
   "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-400";
 
@@ -194,6 +200,10 @@ export function UploadPage() {
 
     if (!slug.trim() || !displayName.trim() || !version.trim() || !changelog.trim()) {
       setError("Please fill in all required fields.");
+      return;
+    }
+    if (!isValidSemver(version.trim())) {
+      setError("Invalid version format. Must follow Semantic Versioning (e.g. 1.0.0, 0.2.1-beta).");
       return;
     }
 
@@ -311,8 +321,13 @@ export function UploadPage() {
               value={version}
               onChange={(e) => setVersion(e.target.value)}
               placeholder="1.0.0"
-              className={inputCls}
+              className={`${inputCls} ${version.trim() && !isValidSemver(version.trim()) ? "border-red-400 focus:border-red-500 focus:ring-red-500 dark:border-red-500 dark:focus:border-red-400 dark:focus:ring-red-400" : ""}`}
             />
+            {version.trim() && !isValidSemver(version.trim()) && (
+              <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                Invalid format. Use MAJOR.MINOR.PATCH (e.g. 1.0.0, 0.2.1-beta).
+              </p>
+            )}
             <div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-blue-50 px-2.5 py-2 dark:bg-blue-950/40">
               <Info size={14} className="mt-0.5 shrink-0 text-blue-500 dark:text-blue-400" />
               <p className="text-xs leading-relaxed text-blue-700 dark:text-blue-300">

@@ -1,10 +1,21 @@
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
+</p>
+
 # WiClawHub
 
 WiClawHub 是一個企業級、可自建部署的代理人技能註冊與管理平台，靈感來自 [ClawHub](https://clawhub.ai/)。
 
 提供技能的發布、版本管理、搜尋與下載功能，API 與 ClawHub OpenAPI v1 規格完全相容。
 
-![](./assets/wilclawhub_cover.png)
+![](./docs/assets/wilclawhub_cover.png)
+
+## 文件
+
+- 英文（預設）：[`README.md`](README.md)
+  - [如何搭配 WiClawHub 使用 ClawHub CLI](./docs/clawhub_cli_zh-TW.md)
+- 繁體中文：`README_zh-TW.md`（本文件）
+- 簡體中文：[`README_zh-CN.md`](README_zh-CN.md)
 
 ## 構建原由
 
@@ -12,7 +23,7 @@ WiClawHub 是一個企業級、可自建部署的代理人技能註冊與管理�
 
 企業建立自地端（Self-hosted）代理人技能樞紐（Skill Hub），主要是為了將分散的 AI 能力轉化為可管理、可複用且安全的企業資產。
 
-![](./assets/wiclaw_hub_purpose.png)
+![](./docs/assets/wiclaw_hub_purpose.png)
 
 以下是核心原因：
 

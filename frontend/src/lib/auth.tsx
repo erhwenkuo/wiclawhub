@@ -20,6 +20,7 @@ interface AuthState {
   loginWithTokens: (accessToken: string, refreshToken: string) => Promise<boolean>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  authFetch: <T = unknown>(path: string, init?: RequestInit) => Promise<T>;
 }
 
 const AuthContext = createContext<AuthState>({
@@ -30,6 +31,7 @@ const AuthContext = createContext<AuthState>({
   loginWithTokens: async () => false,
   logout: () => {},
   refreshUser: async () => {},
+  authFetch: () => Promise.reject(new Error("AuthProvider not mounted")),
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -42,6 +44,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Owner | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const tryRefreshToken = useCallback(async (): Promise<string | null> => {
+    const rt = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!rt) return null;
+    try {
+      const res = await apiFetch<{
+        access_token: string;
+        refresh_token: string;
+        user: Owner;
+      }>("/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rt }),
+      });
+      localStorage.setItem(TOKEN_KEY, res.access_token);
+      localStorage.setItem(REFRESH_TOKEN_KEY, res.refresh_token);
+      setToken(res.access_token);
+      setRefreshToken(res.refresh_token);
+      setUser(res.user);
+      return res.access_token;
+    } catch {
+      // Refresh token also expired — force logout
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      setToken(null);
+      setRefreshToken(null);
+      setUser(null);
+      return null;
+    }
+  }, []);
+
   const fetchUser = useCallback(async (t: string) => {
     try {
       setIsLoading(true);
@@ -51,12 +83,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(res.user);
       return true;
     } catch {
+      // Token may have expired — try refresh
+      const newToken = await tryRefreshToken();
+      if (newToken) return true;
       setUser(null);
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [tryRefreshToken]);
 
   useEffect(() => {
     if (token) {
@@ -98,6 +133,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token, fetchUser]);
 
+  const authFetch = useCallback(
+    async <T = unknown>(path: string, init?: RequestInit): Promise<T> => {
+      const currentToken = localStorage.getItem(TOKEN_KEY);
+      if (!currentToken) throw new Error("Not authenticated");
+
+      const headers = { ...init?.headers, Authorization: `Bearer ${currentToken}` };
+      try {
+        return await apiFetch<T>(path, { ...init, headers });
+      } catch (err: unknown) {
+        // On 401, try refreshing the token and retry once
+        if (err instanceof Error && err.message.includes("401")) {
+          const newToken = await tryRefreshToken();
+          if (newToken) {
+            return await apiFetch<T>(path, {
+              ...init,
+              headers: { ...init?.headers, Authorization: `Bearer ${newToken}` },
+            });
+          }
+        }
+        throw err;
+      }
+    },
+    [tryRefreshToken],
+  );
+
   const logout = useCallback(async () => {
     // Attempt to revoke refresh token server-side
     if (token) {
@@ -118,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   return (
-    <AuthContext.Provider value={{ token, user, isLoading, login, loginWithTokens, logout, refreshUser }}>
+    <AuthContext.Provider value={{ token, user, isLoading, login, loginWithTokens, logout, refreshUser, authFetch }}>
       {children}
     </AuthContext.Provider>
   );

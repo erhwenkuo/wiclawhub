@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -142,6 +143,22 @@ async def get_skill(session: AsyncSession, slug: str, increment_view: bool = Tru
     }
 
 
+SEMVER_RE = re.compile(
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+    r"(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
+    r"(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
+)
+
+
+def validate_semver(version: str) -> str:
+    """Validate and return a SemVer string. Raises ValueError if invalid."""
+    if not SEMVER_RE.match(version):
+        raise ValueError(
+            f"Invalid version '{version}'. Must follow Semantic Versioning (e.g. 1.0.0, 0.2.1-beta)."
+        )
+    return version
+
+
 async def create_or_update_skill(
     session: AsyncSession,
     owner: User,
@@ -153,6 +170,7 @@ async def create_or_update_skill(
     tags: list[str] | dict | None = None,
     summary: str | None = None,
 ) -> tuple[Skill, SkillVersion]:
+    validate_semver(version)
     result = await session.execute(select(Skill).where(Skill.slug == slug))
     skill = result.scalars().first()
 

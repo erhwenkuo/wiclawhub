@@ -8,14 +8,11 @@ import { formatNumber } from "@/lib/format";
 import { Spinner } from "@/components/Spinner";
 
 export function DashboardPage() {
-  const { token } = useAuth();
+  const { token, authFetch } = useAuth();
 
   const { data, isLoading } = useQuery<SkillListResponse>({
     queryKey: ["my-skills", token],
-    queryFn: () =>
-      apiFetch("/skills?limit=100&owner=me", {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }),
+    queryFn: () => authFetch<SkillListResponse>("/skills?limit=100&owner=me"),
     enabled: !!token,
   });
 
