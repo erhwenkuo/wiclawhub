@@ -54,7 +54,7 @@ def upgrade() -> None:
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.add_column(sa.Column('email', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True))
         batch_op.add_column(sa.Column('password_hash', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True))
-        batch_op.add_column(sa.Column('email_verified', sa.Boolean(), nullable=False, server_default=sa.text('0')))
+        batch_op.add_column(sa.Column('email_verified', sa.Boolean(), nullable=False, server_default=sa.text('false')))
         batch_op.add_column(sa.Column('auth_provider', sqlmodel.sql.sqltypes.AutoString(length=50), nullable=True))
         batch_op.alter_column('api_token_hash',
                existing_type=sa.VARCHAR(length=255),

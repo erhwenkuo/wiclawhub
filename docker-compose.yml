@@ -1,3 +1,7 @@
+env_file:
+  - path: .env.docker
+    required: false
+
 services:
   backend:
     build: ./backend
@@ -6,7 +10,8 @@ services:
     environment:
       - DATABASE_URL=sqlite+aiosqlite:///./wiclawhub.db
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
-      - CORS_ORIGINS=["http://localhost", "http://localhost:3000"]
+      - FRONTEND_URL=${SITE_URL:-http://localhost}
+      - CORS_ORIGINS=["${SITE_URL:-http://localhost}","http://localhost","http://localhost:3000"]
       - DEBUG=false
     volumes:
       - db-data:/app

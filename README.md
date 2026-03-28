@@ -88,13 +88,135 @@ Key reasons:
 
 ## Quick Start
 
-### Prerequisites
+### Option A: Docker Deployment (Recommended)
+
+The fastest way to get WiClawHub running. Requires only [Docker](https://docs.docker.com/get-docker/) and Docker Compose.
+
+#### 1. Configure Environment
+
+Create a `.env.docker` file from the provided template. Docker Compose reads this file automatically on startup (separate from the dev `.env` to avoid conflicts):
+
+```bash
+cp .env.docker.example .env.docker
+vi .env.docker
+```
+
+Set at minimum:
+
+```env
+# REQUIRED: Change this to a secure random string
+SECRET_KEY=your-secret-random-string
+
+# For LAN/remote access: set to your server's IP or domain
+# If only accessing from localhost, you can skip this
+SITE_URL=http://192.168.50.25
+
+# Optional: PostgreSQL password (default: wiclawhub)
+# POSTGRES_PASSWORD=your-db-password
+```
+
+> **Important:** `SITE_URL` controls how the ClawHub CLI discovers your instance. If other machines on your network need to access WiClawHub, set this to your server's LAN IP (e.g., `http://192.168.50.25`) or domain. If you only access it from `localhost`, you can skip this.
+
+#### 2. Choose a Database and Start
+
+**With SQLite** (simple, no external database):
+
+```bash
+docker compose up -d
+```
+
+**With PostgreSQL** (recommended for production):
+
+```bash
+docker compose -f docker-compose.postgres.yml up -d
+```
+
+#### 3. Verify
+
+```bash
+# Check all containers are running
+docker compose ps
+
+# Test health endpoint
+curl http://localhost/health
+
+# Test service discovery (used by ClawHub CLI)
+curl http://localhost/.well-known/clawhub.json
+```
+
+Open `http://localhost` (or `http://<your-server-ip>`) in your browser to access WiClawHub.
+
+#### 4. Connect ClawHub CLI
+
+On any machine that needs to interact with WiClawHub:
+
+```bash
+# Point CLI to your WiClawHub instance
+export CLAWHUB_SITE="http://192.168.50.25"
+export CLAWHUB_REGISTRY="http://192.168.50.25"
+export CLAWHUB_DISABLE_TELEMETRY=1
+
+# Login (opens browser for authentication)
+npx clawhub@latest login
+```
+
+#### Docker Environment Variables Reference
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SITE_URL` | `http://localhost` | Public URL of WiClawHub (used for CLI discovery, CORS, OAuth callbacks) |
+| `SECRET_KEY` | `change-me-in-production` | Secret key for JWT signing — **must change in production** |
+| `POSTGRES_PASSWORD` | `wiclawhub` | PostgreSQL password (only for `docker-compose.postgres.yml`) |
+
+#### Stopping and Cleanup
+
+```bash
+# Stop services (keeps data)
+docker compose down
+
+# Stop and remove all data (fresh start)
+docker compose down -v
+```
+
+---
+
+### Option B: Local Development
+
+For development with hot-reload and debugging.
+
+#### Prerequisites
 
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
-- Node.js 20+ (frontend package management)
+- Node.js 20+ (frontend)
 
-### Backend Setup
+#### Environment Variables
+
+Copy `.env.example` to `.env` and modify:
+
+```env
+# Database (defaults to SQLite)
+DATABASE_URL=sqlite+aiosqlite:///./wiclawhub.db
+
+# For PostgreSQL:
+# DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/wiclawhub
+
+# Auth
+SECRET_KEY=your-secret-key
+
+# Frontend URL (Vite dev server)
+FRONTEND_URL=http://localhost:5173
+
+# OAuth - GitHub (create an OAuth App in GitHub Developer Settings)
+# GITHUB_CLIENT_ID=
+# GITHUB_CLIENT_SECRET=
+
+# OAuth - Google (create OAuth 2.0 credentials in Google Cloud Console)
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
+```
+
+#### Backend Setup
 
 ```bash
 # Activate virtual environment
@@ -111,7 +233,7 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend Setup
+#### Frontend Setup
 
 ```bash
 cd frontend
@@ -123,43 +245,7 @@ npm install
 npm run dev
 ```
 
-### Environment Variables
-
-Copy `.env.example` to `.env` and modify:
-
-```env
-# Site name (displayed in header, footer, and home page)
-# SKILL_SITE_NAME=WiClawHub
-
-# Database (defaults to SQLite, requires async driver)
-DATABASE_URL=sqlite+aiosqlite:///./wiclawhub.db
-
-# Switch to PostgreSQL
-# DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/wiclawhub
-
-# Auth
-SECRET_KEY=your-secret-key
-
-# JWT (defaults to SECRET_KEY)
-# JWT_SECRET_KEY=
-# JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
-# JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# OAuth - GitHub (create an OAuth App in GitHub Developer Settings)
-# GITHUB_CLIENT_ID=
-# GITHUB_CLIENT_SECRET=
-
-# OAuth - Google (create OAuth 2.0 credentials in Google Cloud Console)
-# GOOGLE_CLIENT_ID=
-# GOOGLE_CLIENT_SECRET=
-
-# Frontend URL (for OAuth callbacks)
-FRONTEND_URL=http://localhost:5173
-
-# Rate limiting (requests per minute)
-RATE_LIMIT_READ=120
-RATE_LIMIT_WRITE=30
-```
+The frontend runs at `http://localhost:5173` and proxies API calls to the backend at `http://localhost:8000`.
 
 ## API Documentation
 
@@ -200,27 +286,38 @@ After starting the backend, visit:
 wiclawhub/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI application entry point
-│   │   ├── config.py         # Configuration management
-│   │   ├── database.py       # Database connection
-│   │   ├── models/           # SQLModel data models
-│   │   ├── schemas/          # Pydantic request/response models
-│   │   ├── routers/          # API routes
-│   │   ├── services/         # Business logic
-│   │   └── auth/             # Authentication
-│   ├── tests/                # Tests
-│   ├── alembic/              # Database migrations
+│   │   ├── main.py           # FastAPI application entry point
+│   │   ├── config.py          # Configuration management
+│   │   ├── database.py        # Database connection
+│   │   ├── models/            # SQLModel data models
+│   │   ├── schemas/           # Pydantic request/response models
+│   │   ├── routers/           # API routes
+│   │   ├── services/          # Business logic
+│   │   └── auth/              # Authentication
+│   ├── tests/                 # Tests
+│   ├── alembic/               # Database migrations
+│   ├── Dockerfile             # Backend container image
 │   └── pyproject.toml
 ├── frontend/
 │   ├── src/
-│   │   ├── routes/           # Page routes
-│   │   ├── components/       # React components
-│   │   ├── lib/              # Utility functions
-│   │   └── styles.css        # Global styles
+│   │   ├── routes/            # Page routes
+│   │   ├── components/        # React components
+│   │   ├── lib/               # Utility functions
+│   │   └── styles.css         # Global styles
+│   ├── Dockerfile             # Frontend container image (nginx)
+│   ├── nginx.conf             # Nginx reverse proxy config
 │   └── package.json
-├── PLAN.md                   # Implementation plan
-├── CLAUDE.md                 # Development guide
-└── README.md                 # This file
+├── docs/
+│   ├── assets/                # Images and diagrams
+│   ├── clawhub_cli.md         # ClawHub CLI usage guide (EN)
+│   └── zh-tw/                 # Traditional Chinese docs
+│       └── clawhub_cli.md
+├── docker-compose.yml         # Docker deployment (SQLite)
+├── docker-compose.postgres.yml # Docker deployment (PostgreSQL)
+├── .env.docker.example        # Docker environment template
+├── .env.example               # Local dev environment template
+├── CLAUDE.md                  # Development guide
+└── README.md                  # This file
 ```
 
 

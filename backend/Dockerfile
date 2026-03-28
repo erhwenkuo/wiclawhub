@@ -3,7 +3,7 @@ FROM python:3.13-slim AS base
 WORKDIR /app
 
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[postgres]"
 
 COPY app/ app/
 COPY alembic/ alembic/

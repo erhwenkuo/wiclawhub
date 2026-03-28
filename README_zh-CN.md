@@ -86,13 +86,135 @@ WiClawHub 是一个企业级、可自建部署的代理人技能注册与管理�
 
 ## 快速开始
 
-### 前置需求
+### 方式 A：Docker 部署（推荐）
+
+最快速的启动方式，仅需安装 [Docker](https://docs.docker.com/get-docker/) 和 Docker Compose。
+
+#### 1. 配置环境变量
+
+从模板创建 `.env.docker` 文件。Docker Compose 启动时会自动读取此文件（与开发用的 `.env` 分开，避免冲突）：
+
+```bash
+cp .env.docker.example .env.docker
+vi .env.docker
+```
+
+至少设置以下项目：
+
+```env
+# 必须：请改为安全的随机字符串
+SECRET_KEY=your-secret-random-string
+
+# 局域网 / 远程访问：设为服务器的 IP 或域名
+# 若仅从 localhost 访问，可跳过此项
+SITE_URL=http://192.168.50.25
+
+# 可选：PostgreSQL 密码（默认：wiclawhub）
+# POSTGRES_PASSWORD=your-db-password
+```
+
+> **重要：** `SITE_URL` 控制 ClawHub CLI 如何发现你的实例。若局域网中的其他机器需要访问 WiClawHub，请设为服务器的局域网 IP（例如 `http://192.168.50.25`）或域名。若仅从 `localhost` 访问，可跳过此设置。
+
+#### 2. 选择数据库并启动
+
+**使用 SQLite**（简单，无需外部数据库）：
+
+```bash
+docker compose up -d
+```
+
+**使用 PostgreSQL**（建议用于生产环境）：
+
+```bash
+docker compose -f docker-compose.postgres.yml up -d
+```
+
+#### 3. 验证
+
+```bash
+# 确认所有容器正在运行
+docker compose ps
+
+# 测试健康检查端点
+curl http://localhost/health
+
+# 测试服务发现（供 ClawHub CLI 使用）
+curl http://localhost/.well-known/clawhub.json
+```
+
+在浏览器中打开 `http://localhost`（或 `http://<你的服务器 IP>`）即可访问 WiClawHub。
+
+#### 4. 连接 ClawHub CLI
+
+在任何需要与 WiClawHub 交互的机器上：
+
+```bash
+# 将 CLI 指向你的 WiClawHub 实例
+export CLAWHUB_SITE="http://192.168.50.25"
+export CLAWHUB_REGISTRY="http://192.168.50.25"
+export CLAWHUB_DISABLE_TELEMETRY=1
+
+# 登录（打开浏览器进行认证）
+npx clawhub@latest login
+```
+
+#### Docker 环境变量参考
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `SITE_URL` | `http://localhost` | WiClawHub 的公开 URL（用于 CLI 发现、CORS、OAuth 回调） |
+| `SECRET_KEY` | `change-me-in-production` | JWT 签名密钥 — **生产环境必须更改** |
+| `POSTGRES_PASSWORD` | `wiclawhub` | PostgreSQL 密码（仅适用于 `docker-compose.postgres.yml`） |
+
+#### 停止与清理
+
+```bash
+# 停止服务（保留数据）
+docker compose down
+
+# 停止并移除所有数据（重新开始）
+docker compose down -v
+```
+
+---
+
+### 方式 B：本地开发
+
+适用于需要热重载（hot-reload）与调试的开发环境。
+
+#### 前置需求
 
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/) (Python 包管理)
-- Node.js 20+ (前端包管理)
+- Node.js 20+ (前端)
 
-### Backend 启动
+#### 环境变量
+
+复制 `.env.example` 为 `.env` 并修改：
+
+```env
+# 数据库（默认使用 SQLite）
+DATABASE_URL=sqlite+aiosqlite:///./wiclawhub.db
+
+# 切换为 PostgreSQL：
+# DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/wiclawhub
+
+# Auth
+SECRET_KEY=your-secret-key
+
+# Frontend URL（Vite 开发服务器）
+FRONTEND_URL=http://localhost:5173
+
+# OAuth - GitHub（在 GitHub Developer Settings 创建 OAuth App）
+# GITHUB_CLIENT_ID=
+# GITHUB_CLIENT_SECRET=
+
+# OAuth - Google（在 Google Cloud Console 创建 OAuth 2.0 凭证）
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
+```
+
+#### Backend 启动
 
 ```bash
 # 启动虚拟环境
@@ -109,7 +231,7 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend 启动
+#### Frontend 启动
 
 ```bash
 cd frontend
@@ -121,43 +243,7 @@ npm install
 npm run dev
 ```
 
-### 环境变量
-
-复制 `.env.example` 为 `.env` 并修改：
-
-```env
-# 网站名称（显示于页首、页尾与首页）
-# SKILL_SITE_NAME=WiClawHub
-
-# Database (默认使用 SQLite，需使用 async driver)
-DATABASE_URL=sqlite+aiosqlite:///./wiclawhub.db
-
-# 切换为 PostgreSQL
-# DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/wiclawhub
-
-# Auth
-SECRET_KEY=your-secret-key
-
-# JWT (默认使用 SECRET_KEY)
-# JWT_SECRET_KEY=
-# JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
-# JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# OAuth - GitHub (在 GitHub Developer Settings 创建 OAuth App)
-# GITHUB_CLIENT_ID=
-# GITHUB_CLIENT_SECRET=
-
-# OAuth - Google (在 Google Cloud Console 创建 OAuth 2.0 凭证)
-# GOOGLE_CLIENT_ID=
-# GOOGLE_CLIENT_SECRET=
-
-# Frontend URL (OAuth callback 用)
-FRONTEND_URL=http://localhost:5173
-
-# Rate limiting (requests per minute)
-RATE_LIMIT_READ=120
-RATE_LIMIT_WRITE=30
-```
+前端运行于 `http://localhost:5173`，并将 API 请求代理至后端的 `http://localhost:8000`。
 
 ## API 文档
 
@@ -198,26 +284,38 @@ RATE_LIMIT_WRITE=30
 wiclawhub/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI 应用程序入口
-│   │   ├── config.py         # 配置管理
-│   │   ├── database.py       # 数据库连接
-│   │   ├── models/           # SQLModel 数据模型
-│   │   ├── schemas/          # Pydantic 请求/响应模型
-│   │   ├── routers/          # API 路由
-│   │   ├── services/         # 业务逻辑
-│   │   └── auth/             # 认证
-│   ├── tests/                # 测试
-│   ├── alembic/              # 数据库迁移
+│   │   ├── main.py           # FastAPI 应用程序入口
+│   │   ├── config.py          # 配置管理
+│   │   ├── database.py        # 数据库连接
+│   │   ├── models/            # SQLModel 数据模型
+│   │   ├── schemas/           # Pydantic 请求/响应模型
+│   │   ├── routers/           # API 路由
+│   │   ├── services/          # 业务逻辑
+│   │   └── auth/              # 认证
+│   ├── tests/                 # 测试
+│   ├── alembic/               # 数据库迁移
+│   ├── Dockerfile             # Backend 容器镜像
 │   └── pyproject.toml
 ├── frontend/
 │   ├── src/
-│   │   ├── routes/           # 页面路由
-│   │   ├── components/       # React 组件
-│   │   ├── lib/              # 工具函数
-│   │   └── styles.css        # 全局样式
-├── PLAN.md                   # 实施计划
-├── CLAUDE.md                 # 开发说明
-└── README.md                 # 本文件
+│   │   ├── routes/            # 页面路由
+│   │   ├── components/        # React 组件
+│   │   ├── lib/               # 工具函数
+│   │   └── styles.css         # 全局样式
+│   ├── Dockerfile             # Frontend 容器镜像（nginx）
+│   ├── nginx.conf             # Nginx 反向代理配置
+│   └── package.json
+├── docs/
+│   ├── assets/                # 图片与图表
+│   ├── clawhub_cli.md         # ClawHub CLI 使用指南（英文）
+│   └── zh-tw/                 # 繁体中文文档
+│       └── clawhub_cli.md
+├── docker-compose.yml         # Docker 部署（SQLite）
+├── docker-compose.postgres.yml # Docker 部署（PostgreSQL）
+├── .env.docker.example        # Docker 环境变量模板
+├── .env.example               # 本地开发环境变量模板
+├── CLAUDE.md                  # 开发说明
+└── README.md                  # 本文件
 ```
 
 ## 授权

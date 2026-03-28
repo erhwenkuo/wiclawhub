@@ -1,3 +1,7 @@
+env_file:
+  - path: .env.docker
+    required: false
+
 services:
   db:
     image: postgres:16-alpine
@@ -9,6 +13,11 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wiclawhub"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   backend:
     build: ./backend
@@ -17,10 +26,12 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://wiclawhub:${POSTGRES_PASSWORD:-wiclawhub}@db:5432/wiclawhub
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
-      - CORS_ORIGINS=["http://localhost", "http://localhost:3000"]
+      - FRONTEND_URL=${SITE_URL:-http://localhost}
+      - CORS_ORIGINS=["${SITE_URL:-http://localhost}","http://localhost","http://localhost:3000"]
       - DEBUG=false
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   frontend:
     build: ./frontend

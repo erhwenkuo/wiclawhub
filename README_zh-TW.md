@@ -86,13 +86,135 @@ WiClawHub 是一個企業級、可自建部署的代理人技能註冊與管理�
 
 ## 快速開始
 
-### 前置需求
+### 方式 A：Docker 部署（推薦）
+
+最快速的啟動方式，僅需安裝 [Docker](https://docs.docker.com/get-docker/) 和 Docker Compose。
+
+#### 1. 設定環境變數
+
+從範本建立 `.env.docker` 檔案。Docker Compose 啟動時會自動讀取此檔案（與開發用的 `.env` 分開，避免衝突）：
+
+```bash
+cp .env.docker.example .env.docker
+vi .env.docker
+```
+
+至少設定以下項目：
+
+```env
+# 必要：請改為安全的隨機字串
+SECRET_KEY=your-secret-random-string
+
+# 區域網路 / 遠端存取：設為伺服器的 IP 或網域
+# 若僅從 localhost 存取，可略過此項
+SITE_URL=http://192.168.50.25
+
+# 選用：PostgreSQL 密碼（預設：wiclawhub）
+# POSTGRES_PASSWORD=your-db-password
+```
+
+> **重要：** `SITE_URL` 控制 ClawHub CLI 如何探索你的實例。若區域網路中的其他機器需要存取 WiClawHub，請設為伺服器的區域網路 IP（例如 `http://192.168.50.25`）或網域。若僅從 `localhost` 存取，可略過此設定。
+
+#### 2. 選擇資料庫並啟動
+
+**使用 SQLite**（簡易，無需外部資料庫）：
+
+```bash
+docker compose up -d
+```
+
+**使用 PostgreSQL**（建議用於正式環境）：
+
+```bash
+docker compose -f docker-compose.postgres.yml up -d
+```
+
+#### 3. 驗證
+
+```bash
+# 確認所有容器正在執行
+docker compose ps
+
+# 測試健康檢查端點
+curl http://localhost/health
+
+# 測試服務探索（供 ClawHub CLI 使用）
+curl http://localhost/.well-known/clawhub.json
+```
+
+在瀏覽器中開啟 `http://localhost`（或 `http://<你的伺服器 IP>`）即可存取 WiClawHub。
+
+#### 4. 連線 ClawHub CLI
+
+在任何需要與 WiClawHub 互動的機器上：
+
+```bash
+# 將 CLI 指向你的 WiClawHub 實例
+export CLAWHUB_SITE="http://192.168.50.25"
+export CLAWHUB_REGISTRY="http://192.168.50.25"
+export CLAWHUB_DISABLE_TELEMETRY=1
+
+# 登入（開啟瀏覽器進行認證）
+npx clawhub@latest login
+```
+
+#### Docker 環境變數參考
+
+| 變數 | 預設值 | 說明 |
+|------|--------|------|
+| `SITE_URL` | `http://localhost` | WiClawHub 的公開 URL（用於 CLI 探索、CORS、OAuth 回呼） |
+| `SECRET_KEY` | `change-me-in-production` | JWT 簽章密鑰 — **正式環境必須更改** |
+| `POSTGRES_PASSWORD` | `wiclawhub` | PostgreSQL 密碼（僅適用於 `docker-compose.postgres.yml`） |
+
+#### 停止與清理
+
+```bash
+# 停止服務（保留資料）
+docker compose down
+
+# 停止並移除所有資料（重新開始）
+docker compose down -v
+```
+
+---
+
+### 方式 B：本機開發
+
+適用於需要即時重載（hot-reload）與除錯的開發環境。
+
+#### 前置需求
 
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/) (Python 套件管理)
-- Node.js 20+ (前端套件管理)
+- Node.js 20+ (前端)
 
-### Backend 啟動
+#### 環境變數
+
+複製 `.env.example` 為 `.env` 並修改：
+
+```env
+# 資料庫（預設使用 SQLite）
+DATABASE_URL=sqlite+aiosqlite:///./wiclawhub.db
+
+# 切換為 PostgreSQL：
+# DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/wiclawhub
+
+# Auth
+SECRET_KEY=your-secret-key
+
+# Frontend URL（Vite 開發伺服器）
+FRONTEND_URL=http://localhost:5173
+
+# OAuth - GitHub（至 GitHub Developer Settings 建立 OAuth App）
+# GITHUB_CLIENT_ID=
+# GITHUB_CLIENT_SECRET=
+
+# OAuth - Google（至 Google Cloud Console 建立 OAuth 2.0 憑證）
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
+```
+
+#### Backend 啟動
 
 ```bash
 # 啟動虛擬環境
@@ -109,7 +231,7 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend 啟動
+#### Frontend 啟動
 
 ```bash
 cd frontend
@@ -121,43 +243,7 @@ npm install
 npm run dev
 ```
 
-### 環境變數
-
-複製 `.env.example` 為 `.env` 並修改：
-
-```env
-# 網站名稱（顯示於頁首、頁尾與首頁）
-# SKILL_SITE_NAME=WiClawHub
-
-# Database (預設使用 SQLite，需使用 async driver)
-DATABASE_URL=sqlite+aiosqlite:///./wiclawhub.db
-
-# 切換為 PostgreSQL
-# DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/wiclawhub
-
-# Auth
-SECRET_KEY=your-secret-key
-
-# JWT (預設使用 SECRET_KEY)
-# JWT_SECRET_KEY=
-# JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
-# JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# OAuth - GitHub (至 GitHub Developer Settings 建立 OAuth App)
-# GITHUB_CLIENT_ID=
-# GITHUB_CLIENT_SECRET=
-
-# OAuth - Google (至 Google Cloud Console 建立 OAuth 2.0 憑證)
-# GOOGLE_CLIENT_ID=
-# GOOGLE_CLIENT_SECRET=
-
-# Frontend URL (OAuth callback 用)
-FRONTEND_URL=http://localhost:5173
-
-# Rate limiting (requests per minute)
-RATE_LIMIT_READ=120
-RATE_LIMIT_WRITE=30
-```
+前端執行於 `http://localhost:5173`，並將 API 請求代理至後端的 `http://localhost:8000`。
 
 ## API 文件
 
@@ -198,27 +284,38 @@ RATE_LIMIT_WRITE=30
 wiclawhub/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI 應用程式入口
-│   │   ├── config.py         # 設定管理
-│   │   ├── database.py       # 資料庫連線
-│   │   ├── models/           # SQLModel 資料模型
-│   │   ├── schemas/          # Pydantic 請求/回應模型
-│   │   ├── routers/          # API 路由
-│   │   ├── services/         # 業務邏輯
-│   │   └── auth/             # 認證
-│   ├── tests/                # 測試
-│   ├── alembic/              # 資料庫遷移
+│   │   ├── main.py           # FastAPI 應用程式入口
+│   │   ├── config.py          # 設定管理
+│   │   ├── database.py        # 資料庫連線
+│   │   ├── models/            # SQLModel 資料模型
+│   │   ├── schemas/           # Pydantic 請求/回應模型
+│   │   ├── routers/           # API 路由
+│   │   ├── services/          # 業務邏輯
+│   │   └── auth/              # 認證
+│   ├── tests/                 # 測試
+│   ├── alembic/               # 資料庫遷移
+│   ├── Dockerfile             # Backend 容器映像
 │   └── pyproject.toml
 ├── frontend/
 │   ├── src/
-│   │   ├── routes/           # 頁面路由
-│   │   ├── components/       # React 元件
-│   │   ├── lib/              # 工具函式
-│   │   └── styles.css        # 全域樣式
+│   │   ├── routes/            # 頁面路由
+│   │   ├── components/        # React 元件
+│   │   ├── lib/               # 工具函式
+│   │   └── styles.css         # 全域樣式
+│   ├── Dockerfile             # Frontend 容器映像（nginx）
+│   ├── nginx.conf             # Nginx 反向代理設定
 │   └── package.json
-├── PLAN.md                   # 實作計劃
-├── CLAUDE.md                 # 開發說明
-└── README.md                 # 本文件
+├── docs/
+│   ├── assets/                # 圖片與圖表
+│   ├── clawhub_cli.md         # ClawHub CLI 使用指南（英文）
+│   └── zh-tw/                 # 繁體中文文件
+│       └── clawhub_cli.md
+├── docker-compose.yml         # Docker 部署（SQLite）
+├── docker-compose.postgres.yml # Docker 部署（PostgreSQL）
+├── .env.docker.example        # Docker 環境變數範本
+├── .env.example               # 本機開發環境變數範本
+├── CLAUDE.md                  # 開發說明
+└── README.md                  # 本文件
 ```
 
 ## 授權
