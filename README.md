@@ -94,12 +94,14 @@ The fastest way to get WiClawHub running. Requires only [Docker](https://docs.do
 
 #### 1. Configure Environment
 
-Create a `.env.docker` file from the provided template. Docker Compose reads this file automatically on startup (separate from the dev `.env` to avoid conflicts):
+Create a `.env.docker` file from the provided template (separate from the dev `.env` to avoid conflicts):
 
 ```bash
 cp .env.docker.example .env.docker
 vi .env.docker
 ```
+
+> **Tip:** Docker Compose only reads `.env` automatically for variable substitution. Since we use a separate `.env.docker` file, you must pass `--env-file .env.docker` when running `docker compose` commands. All Docker commands in this guide already include this flag.
 
 Set at minimum:
 
@@ -122,13 +124,13 @@ SITE_URL=http://192.168.50.25
 **With SQLite** (simple, no external database):
 
 ```bash
-docker compose up -d
+docker compose --env-file .env.docker up -d
 ```
 
 **With PostgreSQL** (recommended for production):
 
 ```bash
-docker compose -f docker-compose.postgres.yml up -d
+docker compose --env-file .env.docker -f docker-compose.postgres.yml up -d
 ```
 
 #### 3. Verify

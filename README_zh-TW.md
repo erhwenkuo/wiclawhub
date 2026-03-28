@@ -92,12 +92,14 @@ WiClawHub 是一個企業級、可自建部署的代理人技能註冊與管理�
 
 #### 1. 設定環境變數
 
-從範本建立 `.env.docker` 檔案。Docker Compose 啟動時會自動讀取此檔案（與開發用的 `.env` 分開，避免衝突）：
+從範本建立 `.env.docker` 檔案（與開發用的 `.env` 分開，避免衝突）：
 
 ```bash
 cp .env.docker.example .env.docker
 vi .env.docker
 ```
+
+> **提示：** Docker Compose 僅會自動讀取 `.env` 進行變數替換。由於我們使用獨立的 `.env.docker` 檔案，執行 `docker compose` 指令時須加上 `--env-file .env.docker`。本指南中的所有 Docker 指令已包含此參數。
 
 至少設定以下項目：
 
@@ -120,13 +122,13 @@ SITE_URL=http://192.168.50.25
 **使用 SQLite**（簡易，無需外部資料庫）：
 
 ```bash
-docker compose up -d
+docker compose --env-file .env.docker up -d
 ```
 
 **使用 PostgreSQL**（建議用於正式環境）：
 
 ```bash
-docker compose -f docker-compose.postgres.yml up -d
+docker compose --env-file .env.docker -f docker-compose.postgres.yml up -d
 ```
 
 #### 3. 驗證

@@ -263,21 +263,31 @@ async def logout(
 # ── OAuth ──
 
 
-def _create_oauth_state() -> str:
-    """Create a signed state JWT for CSRF protection."""
+def _create_oauth_state(*, cli_redirect_uri: str | None = None, cli_state: str | None = None) -> str:
+    """Create a signed state JWT for CSRF protection.
+
+    Optionally embeds CLI auth params so the callback can redirect
+    back to /cli/auth instead of /dashboard after OAuth completes.
+    """
     import time
 
-    payload = {"exp": int(time.time()) + 600, "type": "oauth_state"}
+    payload: dict = {"exp": int(time.time()) + 600, "type": "oauth_state"}
+    if cli_redirect_uri:
+        payload["cli_redirect_uri"] = cli_redirect_uri
+    if cli_state:
+        payload["cli_state"] = cli_state
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.JWT_ALGORITHM)
 
 
-def _verify_oauth_state(state: str) -> bool:
-    """Verify the OAuth state token."""
+def _verify_oauth_state(state: str) -> dict | None:
+    """Verify the OAuth state token. Returns the payload if valid, None otherwise."""
     try:
         payload = jwt.decode(state, settings.jwt_secret, algorithms=[settings.JWT_ALGORITHM])
-        return payload.get("type") == "oauth_state"
+        if payload.get("type") != "oauth_state":
+            return None
+        return payload
     except Exception:
-        return False
+        return None
 
 
 @router.get(
@@ -285,11 +295,15 @@ def _verify_oauth_state(state: str) -> bool:
     tags=["auth"],
     summary="Start OAuth flow",
 )
-async def oauth_authorize(provider: str):
+async def oauth_authorize(
+    provider: str,
+    cli_redirect_uri: str | None = None,
+    cli_state: str | None = None,
+):
     if provider not in OAUTH_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
 
-    state = _create_oauth_state()
+    state = _create_oauth_state(cli_redirect_uri=cli_redirect_uri, cli_state=cli_state)
     callback_url = f"{settings.FRONTEND_URL.rstrip('/')}/api/v1/auth/oauth/{provider}/callback"
 
     if provider == "github":
@@ -326,7 +340,8 @@ async def oauth_callback(
     if provider not in OAUTH_PROVIDERS:
         raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
 
-    if not _verify_oauth_state(state):
+    state_payload = _verify_oauth_state(state)
+    if state_payload is None:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
 
     callback_url = f"{settings.FRONTEND_URL.rstrip('/')}/api/v1/auth/oauth/{provider}/callback"
@@ -417,6 +432,28 @@ async def oauth_callback(
         session=session,
     )
 
-    # Redirect back to frontend with tokens
+    # Check if this OAuth flow was initiated from CLI auth
+    cli_redirect_uri = state_payload.get("cli_redirect_uri")
+    cli_state_val = state_payload.get("cli_state")
+
+    if cli_redirect_uri:
+        # CLI flow: generate an API token and redirect to the CLI's local callback
+        raw_token = secrets.token_hex(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        user.api_token_hash = token_hash
+        session.add(user)
+        await session.commit()
+
+        from urllib.parse import urlparse, urlunparse
+
+        parsed = urlparse(cli_redirect_uri)
+        # Token goes in the hash fragment so it's not sent to the server
+        fragment = f"token={raw_token}"
+        if cli_state_val:
+            fragment += f"&state={cli_state_val}"
+        redirect_url = urlunparse(parsed._replace(fragment=fragment))
+        return RedirectResponse(redirect_url)
+
+    # Normal web flow: redirect back to frontend with tokens
     params = urlencode({"access_token": access, "refresh_token": refresh_tok})
     return RedirectResponse(f"{settings.FRONTEND_URL}/auth/callback?{params}")

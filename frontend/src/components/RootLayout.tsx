@@ -35,7 +35,8 @@ export function RootLayout() {
     <div className="flex min-h-screen flex-col bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
       <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link to="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
+          <Link to="/" className="flex items-center gap-2 text-xl font-bold text-indigo-600 dark:text-indigo-400">
+            <img src="/wiclawhub-logo.png" alt="" className="h-6 w-6 rounded" />
             {siteName}
           </Link>
 

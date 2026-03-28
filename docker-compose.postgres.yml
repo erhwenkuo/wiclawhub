@@ -1,7 +1,3 @@
-env_file:
-  - path: .env.docker
-    required: false
-
 services:
   db:
     image: postgres:16-alpine
